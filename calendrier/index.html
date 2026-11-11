@@ -1233,9 +1233,50 @@ textarea { resize: vertical; min-height: 64px; }
   function hideUndo() { undoAction = null; el.snack.hidden = true; clearTimeout(snackTimer); }
   el.snackUndo.addEventListener("click", function () { var fn = undoAction; hideUndo(); if (fn) fn(); });
 
+  // Vue Semaine : appui long sur une journée puis glisser vers une autre journée = événement sur plusieurs jours.
+  function bindWeekRange(col, startK) {
+    var g = { timer: null, active: false, sx: 0, sy: 0, endK: startK, pid: null, ghost: null };
+    col.addEventListener("pointerdown", function (e) {
+      if (e.button > 0 || (e.target.closest && e.target.closest(".ev, .check, .x, .ttl, .tbtn, .sub, .twrap, textarea, input"))) return;
+      g.sx = e.clientX; g.sy = e.clientY; g.endK = startK; g.pid = e.pointerId;
+      clearTimeout(g.timer);
+      g.timer = setTimeout(function () {
+        g.active = true; buzz(8);
+        g.ghost = el_("div", "ghost", "Période");
+        document.body.appendChild(g.ghost);
+        moveGhost(g.sx, g.sy);
+        try { col.setPointerCapture(g.pid); } catch (err) { /* ignoré */ }
+      }, 300);
+    });
+    col.addEventListener("pointermove", function (e) {
+      if (!g.active) { if (Math.abs(e.clientX - g.sx) + Math.abs(e.clientY - g.sy) > 10) clearTimeout(g.timer); return; }
+      moveGhost(e.clientX, e.clientY);
+      var hit = document.elementFromPoint(e.clientX, e.clientY);
+      var c = hit && hit.closest ? hit.closest(".wday[data-key]") : null;
+      if (c) g.endK = c.getAttribute("data-key");
+    });
+    function end(e, drop) {
+      clearTimeout(g.timer);
+      if (!g.active) return;
+      g.active = false;
+      if (g.ghost) { g.ghost.remove(); g.ghost = null; }
+      suppressClick = true;
+      setTimeout(function () { suppressClick = false; }, 350);
+      if (!drop) return;
+      var a = startK, b = g.endK;
+      if (b < a) { var tmp = a; a = b; b = tmp; }
+      openSheet(a, null, null);
+      el.fAllDay.checked = true;
+      el.fEndDate.value = b === a ? "" : b;
+      syncFields();
+    }
+    col.addEventListener("pointerup", function (e) { end(e, true); });
+    col.addEventListener("pointercancel", function (e) { end(e, false); });
+  }
+
   // ---------- Vue Mois ----------
   // Glissement d'un événement d'une colonne à une autre en vue Semaine (appui long puis glisser).
-  function bindEventMove(btn, id) {
+  function bindEventMove(btn, id, fromK) {
     var g = { timer: null, active: false, sx: 0, sy: 0, ghost: null, pid: null };
     btn.addEventListener("pointerdown", function (e) {
       if (e.button > 0) return;
@@ -1264,16 +1305,27 @@ textarea { resize: vertical; min-height: 64px; }
       if (!drop) return;
       var hit = document.elementFromPoint(e.clientX, e.clientY);
       var c = hit && hit.closest ? hit.closest(".wday[data-key]") : null;
-      if (c) moveEventTo(id, c.getAttribute("data-key"));
+      if (c) moveEventTo(id, c.getAttribute("data-key"), fromK);
     }
     btn.addEventListener("pointerup", function (e) { end(e, true); });
     btn.addEventListener("pointercancel", function (e) { end(e, false); });
   }
   // Appui long sur un événement puis glissement : déplace l'événement vers un autre jour.
   // Appui long sur une case libre puis glissement : crée un événement sur plusieurs jours.
-  function moveEventTo(id, targetK) {
+  function moveEventTo(id, targetK, fromK) {
     var ev = masterOf(id);
-    if (!ev || ev.rule || targetK === ev.date) return;
+    if (!ev) return;
+    if (ev.rule) {
+      // Occurrence d'une série : elle est retirée de la série et recréée ponctuellement au nouveau jour.
+      var from = fromK || ev.date;
+      if (targetK === from) return;
+      ev.skip = (ev.skip || []).concat([from]);
+      events.push(normalize(Object.assign({}, ev, { id: uid(), uid: null, date: targetK, rule: null, until: null, skip: [], endDate: null })));
+      saveEvents();
+      refresh();
+      return;
+    }
+    if (targetK === ev.date) return;
     var delta = Math.round((parseKey(targetK) - parseKey(ev.date)) / 86400000);
     ev.date = targetK;
     if (ev.endDate) ev.endDate = keyOf(addDays(parseKey(ev.endDate), delta));
@@ -1286,7 +1338,8 @@ textarea { resize: vertical; min-height: 64px; }
       if (e.button > 0) return;
       var chip = e.target.closest ? e.target.closest(".chip, .dots i") : null;
       g.mode = chip ? "move" : "range";
-      g.evId = chip && chip.getAttribute("data-rule") !== "1" ? chip.getAttribute("data-id") : null;
+      g.evId = chip ? chip.getAttribute("data-id") : null;
+      g.evDay = startK;
       if (g.mode === "move" && !g.evId) return;
       g.sx = e.clientX; g.sy = e.clientY; g.endK = startK; g.pid = e.pointerId;
       clearTimeout(g.timer);
@@ -1317,7 +1370,7 @@ textarea { resize: vertical; min-height: 64px; }
       var hit = document.elementFromPoint(e.clientX, e.clientY);
       var c = hit && hit.closest ? hit.closest(".cell[data-key]") : null;
       var target = c ? c.getAttribute("data-key") : g.endK;
-      if (g.mode === "move") { moveEventTo(g.evId, target); return; }
+      if (g.mode === "move") { moveEventTo(g.evId, target, g.evDay); return; }
       var a = startK, b = target;
       if (b < a) { var tmp = a; a = b; b = tmp; }
       openSheet(a, null, null);
@@ -1441,7 +1494,7 @@ textarea { resize: vertical; min-height: 64px; }
       list.forEach(function (ev) {
         var eb = evButton(ev);
         col.appendChild(eb);
-        if (!ev.rule) bindEventMove(eb, ev.id);
+        bindEventMove(eb, ev.id, k);
         if (!ev.allDay) {
           var mins = Math.max(0, toMin(ev.end) - toMin(ev.start));
           var key = colorOf(ev);
@@ -1462,6 +1515,7 @@ textarea { resize: vertical; min-height: 64px; }
           state.cursor = dt; renderHeader(); markSelection();
         };
       })(d, k));
+      bindWeekRange(col, k);
       week.appendChild(col);
     }
     el.view.appendChild(week);
