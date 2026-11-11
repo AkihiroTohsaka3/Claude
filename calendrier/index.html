@@ -220,6 +220,10 @@ svg.i { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-widt
 .ag-h.today { color: var(--accent); }
 .ag-task { font-size: 0.88rem; color: var(--muted); padding: 7px 10px; border-radius: 10px; background: var(--surface-2); text-align: left; border: 0; }
 .cal-vis { display: flex; flex-wrap: wrap; gap: 8px; }
+.wc-list { display: grid; gap: 6px; }
+.wc-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 12px; background: var(--surface-2); font-size: 0.9rem; min-width: 0; }
+.wc-row span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.wc-row b { font-variant-numeric: tabular-nums; }
 .cal-vis .opt { display: inline-flex; align-items: center; gap: 6px; }
 .cal-vis .opt i { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
 .cal-vis .opt[aria-pressed="false"] { opacity: 0.45; }
@@ -542,6 +546,10 @@ textarea { resize: vertical; min-height: 64px; }
     <button type="button" class="btn" id="goto-btn">Aller à une date</button>
     <button type="button" class="btn" id="notif-btn">Activer les notifications navigateur</button>
     <p class="hint">Les rappels s'affichent toujours dans l'application tant qu'elle est ouverte. Les notifications du système nécessitent ton accord.</p>
+    <p class="menu-title">Horloge mondiale</p>
+    <div class="copy-row"><input type="text" id="wc-input" list="zones" placeholder="Ex. America/New_York" aria-label="Fuseau horaire"><button type="button" class="btn small" id="wc-add">Ajouter</button></div>
+    <datalist id="zones"><option value="Europe/Paris"><option value="Europe/London"><option value="America/New_York"><option value="America/Montreal"><option value="Asia/Tokyo"><option value="Australia/Sydney"><option value="UTC"></datalist>
+    <div id="wc-list" class="wc-list"></div>
     <p class="menu-title">Données</p>
     <button type="button" class="btn" id="export-btn">Exporter en .ics</button>
     <label class="btn file-btn">Importer un fichier .ics (cours, agenda)
@@ -679,7 +687,8 @@ textarea { resize: vertical; min-height: 64px; }
   var settings = (function () {
     var s = {};
     try { s = JSON.parse(readStore(KEY_SET) || "{}") || {}; } catch (e) { s = {}; }
-    return { weekStart: s.weekStart === 0 ? 0 : 1, dur: [15, 30, 60].indexOf(s.dur) >= 0 ? s.dur : 60, span: s.span === 3 ? 3 : 7, workShade: s.workShade !== false };
+    return { weekStart: s.weekStart === 0 ? 0 : 1, dur: [15, 30, 60].indexOf(s.dur) >= 0 ? s.dur : 60, span: s.span === 3 ? 3 : 7, workShade: s.workShade !== false,
+      zones: Array.isArray(s.zones) ? s.zones.filter(function (z) { return typeof z === "string"; }).slice(0, 6) : [] };
   })();
   function saveSettings() { writeStore(KEY_SET, JSON.stringify(settings)); }
   function dowIdx(d) { return (d.getDay() - settings.weekStart + 7) % 7; }
@@ -1092,7 +1101,9 @@ textarea { resize: vertical; min-height: 64px; }
     b.type = "button";
     b.style.background = colorOf(ev);
     b.appendChild(el_("b", null, ev.title));
-    b.appendChild(el_("small", null, timeLabel(ev) + (ev.place ? " · " + ev.place : "") + repLabel(ev)));
+    var done = ev.checklist ? ev.checklist.filter(function (s) { return s.done; }).length : 0;
+    b.appendChild(el_("small", null, timeLabel(ev) + (ev.place ? " · " + ev.place : "") + repLabel(ev) +
+      (ev.checklist && ev.checklist.length ? " · " + done + "/" + ev.checklist.length + " étapes" : "")));
     b.addEventListener("click", function (e) { e.stopPropagation(); openSheet(ev.occDate, masterOf(ev.id), null); });
     return b;
   }
@@ -1217,6 +1228,65 @@ textarea { resize: vertical; min-height: 64px; }
   el.snackUndo.addEventListener("click", function () { var fn = undoAction; hideUndo(); if (fn) fn(); });
 
   // ---------- Vue Mois ----------
+  // Appui long sur un événement puis glissement : déplace l'événement vers un autre jour.
+  // Appui long sur une case libre puis glissement : crée un événement sur plusieurs jours.
+  function moveEventTo(id, targetK) {
+    var ev = masterOf(id);
+    if (!ev || ev.rule || targetK === ev.date) return;
+    var delta = Math.round((parseKey(targetK) - parseKey(ev.date)) / 86400000);
+    ev.date = targetK;
+    if (ev.endDate) ev.endDate = keyOf(addDays(parseKey(ev.endDate), delta));
+    saveEvents();
+    refresh();
+  }
+  function bindMonthCell(cell, startK) {
+    var g = { timer: null, active: false, mode: null, sx: 0, sy: 0, endK: startK, evId: null, ghost: null, pid: null };
+    cell.addEventListener("pointerdown", function (e) {
+      if (e.button > 0) return;
+      var chip = e.target.closest ? e.target.closest(".chip, .dots i") : null;
+      g.mode = chip ? "move" : "range";
+      g.evId = chip && chip.getAttribute("data-rule") !== "1" ? chip.getAttribute("data-id") : null;
+      if (g.mode === "move" && !g.evId) return;
+      g.sx = e.clientX; g.sy = e.clientY; g.endK = startK; g.pid = e.pointerId;
+      clearTimeout(g.timer);
+      g.timer = setTimeout(function () {
+        g.active = true;
+        buzz(8);
+        g.ghost = el_("div", "ghost", g.mode === "move" ? "Déplacer l'événement" : "Période");
+        document.body.appendChild(g.ghost);
+        moveGhost(g.sx, g.sy);
+        try { cell.setPointerCapture(g.pid); } catch (err) { /* ignoré */ }
+      }, 300);
+    });
+    cell.addEventListener("pointermove", function (e) {
+      if (!g.active) { if (Math.abs(e.clientX - g.sx) + Math.abs(e.clientY - g.sy) > 10) clearTimeout(g.timer); return; }
+      moveGhost(e.clientX, e.clientY);
+      var hit = document.elementFromPoint(e.clientX, e.clientY);
+      var c = hit && hit.closest ? hit.closest(".cell[data-key]") : null;
+      if (c) g.endK = c.getAttribute("data-key");
+    });
+    function end(e, drop) {
+      clearTimeout(g.timer);
+      if (!g.active) return;
+      g.active = false;
+      if (g.ghost) { g.ghost.remove(); g.ghost = null; }
+      suppressClick = true;
+      setTimeout(function () { suppressClick = false; }, 350);
+      if (!drop) return;
+      var hit = document.elementFromPoint(e.clientX, e.clientY);
+      var c = hit && hit.closest ? hit.closest(".cell[data-key]") : null;
+      var target = c ? c.getAttribute("data-key") : g.endK;
+      if (g.mode === "move") { moveEventTo(g.evId, target); return; }
+      var a = startK, b = target;
+      if (b < a) { var tmp = a; a = b; b = tmp; }
+      openSheet(a, null, null);
+      el.fAllDay.checked = true;
+      el.fEndDate.value = b === a ? "" : b;
+      syncFields();
+    }
+    cell.addEventListener("pointerup", function (e) { end(e, true); });
+    cell.addEventListener("pointercancel", function (e) { end(e, false); });
+  }
   function clampIdx(key, rowStart) {
     var diff = Math.round((parseKey(key) - rowStart) / 86400000);
     return Math.max(0, Math.min(6, diff));
@@ -1262,6 +1332,7 @@ textarea { resize: vertical; min-height: 64px; }
       var cell = el_("button", "cell");
       cell.type = "button";
       cell.setAttribute("data-key", k);
+      bindMonthCell(cell, k);
       if (d.getDay() === 0 || d.getDay() === 6) cell.classList.add("we");
       if (d.getMonth() !== c.getMonth()) cell.classList.add("out");
       if (k === todayK) cell.classList.add("today");
@@ -1272,6 +1343,8 @@ textarea { resize: vertical; min-height: 64px; }
       var chips = el_("span", "chips-wrap");
       list.slice(0, 2).forEach(function (ev) {
         var chip = el_("span", "chip", (ev.allDay ? "" : ev.start + " ") + ev.title);
+        chip.setAttribute("data-id", ev.id);
+        chip.setAttribute("data-rule", ev.rule ? "1" : "");
         chip.style.background = colorOf(ev);
         chips.appendChild(chip);
       });
@@ -1280,12 +1353,18 @@ textarea { resize: vertical; min-height: 64px; }
       cell.appendChild(chips);
       if (list.length || open.length) {
         var dots = el_("span", "dots");
-        list.slice(0, 3).forEach(function (ev) { var dot = el_("i"); dot.style.background = colorOf(ev); dots.appendChild(dot); });
+        list.slice(0, 3).forEach(function (ev) {
+          var dot = el_("i");
+          dot.style.background = colorOf(ev);
+          dot.setAttribute("data-id", ev.id);
+          dot.setAttribute("data-rule", ev.rule ? "1" : "");
+          dots.appendChild(dot);
+        });
         if (open.length) dots.appendChild(el_("i", "t"));
         cell.appendChild(dots);
       }
       cell.addEventListener("click", (function (dt) {
-        return function () { state.cursor = dt; openDrawer(keyOf(dt)); renderHeader(); markSelection(); };
+        return function () { if (suppressClick) return; state.cursor = dt; openDrawer(keyOf(dt)); renderHeader(); markSelection(); };
       })(d));
       cellsRow.appendChild(cell);
     }
@@ -1775,7 +1854,7 @@ textarea { resize: vertical; min-height: 64px; }
   function bindTaskDrag(row, t, k) {
     var g = { timer: null, active: false, x: 0, y: 0 };
     row.addEventListener("pointerdown", function (e) {
-      if (e.target.closest("button, textarea, input")) return;
+      if (e.target.closest(".check, .x, .tbtn, textarea, input")) return;
       g.x = e.clientX; g.y = e.clientY;
       clearTimeout(g.timer);
       g.timer = setTimeout(function () {
@@ -1785,6 +1864,7 @@ textarea { resize: vertical; min-height: 64px; }
         ghost = el_("div", "ghost", t.title);
         document.body.appendChild(ghost);
         moveGhost(e.clientX, e.clientY);
+        try { row.setPointerCapture(e.pointerId); } catch (err) { /* ignoré */ }
       }, 300);
     });
     row.addEventListener("pointermove", function (e) {
@@ -2267,6 +2347,15 @@ textarea { resize: vertical; min-height: 64px; }
     evs.forEach(function (ev) {
       evBox.appendChild(evButton(ev));
       if (ev.notes) evBox.appendChild(richText(ev.notes));
+      if (ev.checklist && ev.checklist.length) {
+        var master = masterOf(ev.id);
+        evBox.appendChild(checklist(master.checklist, function (arr) {
+          master.checklist = arr;
+          saveEvents();
+          refresh();
+          openDrawer(k);
+        }, "Ajouter une étape"));
+      }
     });
     el.drawerBody.appendChild(evBox);
     var tks = tasksOn(k);
@@ -2464,7 +2553,7 @@ textarea { resize: vertical; min-height: 64px; }
       box.appendChild(b);
     });
   }
-  el.menuBtn.addEventListener("click", function () { el.menuStatus.textContent = ""; renderCalVis(); openDialog(el.menu); });
+  el.menuBtn.addEventListener("click", function () { el.menuStatus.textContent = ""; renderCalVis(); renderWorldClock(); openDialog(el.menu); });
   el.menuClose.addEventListener("click", function () { closeDialog(el.menu); });
   el.exportClose.addEventListener("click", function () { closeDialog(el.exportDlg); });
   el.exportBtn.addEventListener("click", function () {
@@ -2559,6 +2648,39 @@ textarea { resize: vertical; min-height: 64px; }
   optGroup(document.getElementById("rem-chips"), [
     { value: "0", label: "Aucun" }, { value: "10", label: "10 min" }, { value: "30", label: "30 min" }, { value: "60", label: "1 h" }
   ], document.getElementById("f-remind"), null);
+
+  // Horloge mondiale : heure actuelle dans les fuseaux choisis (Intl, sans réseau).
+  function zoneTime(z) {
+    try {
+      return new Intl.DateTimeFormat("fr-FR", { timeZone: z, weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date());
+    } catch (e) { return "fuseau inconnu"; }
+  }
+  function renderWorldClock() {
+    var box = document.getElementById("wc-list");
+    box.innerHTML = "";
+    settings.zones.forEach(function (z, i) {
+      var row = el_("div", "wc-row");
+      row.appendChild(el_("span", null, z.replace(/_/g, " ")));
+      row.appendChild(el_("b", null, zoneTime(z)));
+      var rm = el_("button", "x", "×");
+      rm.type = "button";
+      rm.setAttribute("aria-label", "Retirer " + z);
+      rm.addEventListener("click", function () { settings.zones.splice(i, 1); saveSettings(); renderWorldClock(); });
+      row.appendChild(rm);
+      box.appendChild(row);
+    });
+  }
+  document.getElementById("wc-add").addEventListener("click", function () {
+    var v = document.getElementById("wc-input").value.trim();
+    if (!v) return;
+    try { new Intl.DateTimeFormat("fr-FR", { timeZone: v }); } catch (e) { el.menuStatus.textContent = "Fuseau inconnu : utilise par exemple Europe/Paris."; return; }
+    if (settings.zones.indexOf(v) < 0 && settings.zones.length < 6) settings.zones.push(v);
+    saveSettings();
+    document.getElementById("wc-input").value = "";
+    el.menuStatus.textContent = "";
+    renderWorldClock();
+  });
+  setInterval(function () { if (el.menu.open) renderWorldClock(); }, 30000);
 
   function renderSettingsBtns() {
     document.getElementById("ws-btn").textContent = "Premier jour : " + (settings.weekStart === 1 ? "lundi" : "dimanche");
