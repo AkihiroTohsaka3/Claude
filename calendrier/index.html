@@ -454,6 +454,7 @@ textarea { resize: vertical; min-height: 64px; }
     </div>
     <input type="hidden" id="f-start"><input type="hidden" id="f-end"><input type="hidden" id="f-date"><input type="hidden" id="f-enddate"><input type="hidden" id="f-until"><input type="hidden" id="f-rule"><input type="hidden" id="f-bbefore"><input type="hidden" id="f-bafter"><input type="hidden" id="f-remind"><input type="hidden" id="f-unit" value="day">
     <label class="field">Lieu <input type="text" id="f-place" maxlength="80" placeholder="Facultatif"></label>
+    <label class="field">Fuseau horaire (facultatif) <input type="text" id="f-tz" list="zones" maxlength="40" placeholder="Ex. Asia/Tokyo"></label>
     <fieldset class="field">
       <legend>Catégorie</legend>
       <div class="swatches" id="swatches"></div>
@@ -650,7 +651,7 @@ textarea { resize: vertical; min-height: 64px; }
       id: e.id || uid(), uid: e.uid || null, title: e.title || "", date: e.date, start: e.start || "09:00", end: e.end || "10:00",
       allDay: !!e.allDay, endDate: e.endDate || null, place: e.place || "", notes: e.notes || "",
       color: e.color || COLORS[0], rule: e.rule || null, until: e.until || null, skip: Array.isArray(e.skip) ? e.skip : [],
-      every: +e.every || 1, unit: e.unit === "week" ? "week" : "day",
+      every: +e.every || 1, unit: e.unit === "week" ? "week" : "day", tz: typeof e.tz === "string" ? e.tz : "",
       bBefore: +e.bBefore || 0, bAfter: +e.bAfter || 0, remind: +e.remind || 0, checklist: Array.isArray(e.checklist) ? e.checklist : []
     };
   }
@@ -1103,8 +1104,8 @@ textarea { resize: vertical; min-height: 64px; }
     b.appendChild(el_("b", null, ev.title));
     var done = ev.checklist ? ev.checklist.filter(function (s) { return s.done; }).length : 0;
     b.appendChild(el_("small", null, timeLabel(ev) + (ev.place ? " · " + ev.place : "") + repLabel(ev) +
-      (ev.checklist && ev.checklist.length ? " · " + done + "/" + ev.checklist.length + " étapes" : "")));
-    b.addEventListener("click", function (e) { e.stopPropagation(); openSheet(ev.occDate, masterOf(ev.id), null); });
+      (ev.checklist && ev.checklist.length ? " · " + done + "/" + ev.checklist.length + " étapes" : "") + (ev.tz ? " · " + ev.tz.split("/").pop().replace(/_/g, " ") : "")));
+    b.addEventListener("click", function (e) { e.stopPropagation(); if (suppressClick) return; openSheet(ev.occDate, masterOf(ev.id), null); });
     return b;
   }
 
@@ -1228,6 +1229,41 @@ textarea { resize: vertical; min-height: 64px; }
   el.snackUndo.addEventListener("click", function () { var fn = undoAction; hideUndo(); if (fn) fn(); });
 
   // ---------- Vue Mois ----------
+  // Glissement d'un événement d'une colonne à une autre en vue Semaine (appui long puis glisser).
+  function bindEventMove(btn, id) {
+    var g = { timer: null, active: false, sx: 0, sy: 0, ghost: null, pid: null };
+    btn.addEventListener("pointerdown", function (e) {
+      if (e.button > 0) return;
+      g.sx = e.clientX; g.sy = e.clientY; g.pid = e.pointerId;
+      clearTimeout(g.timer);
+      g.timer = setTimeout(function () {
+        g.active = true;
+        buzz(8);
+        g.ghost = el_("div", "ghost", "Déplacer l'événement");
+        document.body.appendChild(g.ghost);
+        moveGhost(g.sx, g.sy);
+        try { btn.setPointerCapture(g.pid); } catch (err) { /* ignoré */ }
+      }, 300);
+    });
+    btn.addEventListener("pointermove", function (e) {
+      if (!g.active) { if (Math.abs(e.clientX - g.sx) + Math.abs(e.clientY - g.sy) > 10) clearTimeout(g.timer); return; }
+      moveGhost(e.clientX, e.clientY);
+    });
+    function end(e, drop) {
+      clearTimeout(g.timer);
+      if (!g.active) return;
+      g.active = false;
+      if (g.ghost) { g.ghost.remove(); g.ghost = null; }
+      suppressClick = true;
+      setTimeout(function () { suppressClick = false; }, 350);
+      if (!drop) return;
+      var hit = document.elementFromPoint(e.clientX, e.clientY);
+      var c = hit && hit.closest ? hit.closest(".wday[data-key]") : null;
+      if (c) moveEventTo(id, c.getAttribute("data-key"));
+    }
+    btn.addEventListener("pointerup", function (e) { end(e, true); });
+    btn.addEventListener("pointercancel", function (e) { end(e, false); });
+  }
   // Appui long sur un événement puis glissement : déplace l'événement vers un autre jour.
   // Appui long sur une case libre puis glissement : crée un événement sur plusieurs jours.
   function moveEventTo(id, targetK) {
@@ -1398,7 +1434,9 @@ textarea { resize: vertical; min-height: 64px; }
       var list = eventsOn(k), tks = tasksOn(k);
       if (!list.length && !tks.length) col.appendChild(el_("div", "wempty", "Libre"));
       list.forEach(function (ev) {
-        col.appendChild(evButton(ev));
+        var eb = evButton(ev);
+        col.appendChild(eb);
+        if (!ev.rule) bindEventMove(eb, ev.id);
         if (!ev.allDay) {
           var mins = Math.max(0, toMin(ev.end) - toMin(ev.start));
           var key = colorOf(ev);
@@ -2216,6 +2254,7 @@ textarea { resize: vertical; min-height: 64px; }
     document.getElementById("f-n").value = String(ev && ev.every ? ev.every : 2);
     document.getElementById("f-unit").value = ev && ev.unit === "week" ? "week" : "day";
     el.fPlace.value = ev ? (ev.place || "") : "";
+    document.getElementById("f-tz").value = ev ? (ev.tz || "") : "";
     el.fNotes.value = ev ? (ev.notes || "") : "";
     draftSubs = ev ? (ev.checklist || []).slice() : (fromTask ? (fromTask.subs || []).slice() : []);
     buildSwatches(ev ? catIndex(ev) : 0);
@@ -2249,6 +2288,8 @@ textarea { resize: vertical; min-height: 64px; }
     if (!allDay && end <= start) { setStatus("La fin doit être après le début.", true); return; }
     if (endDate && endDate < date) { setStatus("La date de fin doit être après la date de début.", true); return; }
     if (until && until < date) { setStatus("La fin de répétition doit être après la date de début.", true); return; }
+    var tzv = document.getElementById("f-tz").value.trim();
+    if (tzv) { try { new Intl.DateTimeFormat("fr-FR", { timeZone: tzv }); } catch (err) { setStatus("Fuseau inconnu : utilise par exemple Europe/Paris.", true); return; } }
     var checked = el.swatches.querySelector("input:checked");
     var previous = editingId ? masterOf(editingId) : null;
     var data = normalize({
@@ -2258,6 +2299,7 @@ textarea { resize: vertical; min-height: 64px; }
       skip: previous ? previous.skip : [],
       bBefore: allDay ? 0 : +el.fBBefore.value, bAfter: allDay ? 0 : +el.fBAfter.value,
       remind: +document.getElementById("f-remind").value || 0,
+      tz: document.getElementById("f-tz").value.trim(),
       every: +document.getElementById("f-n").value || 1, unit: document.getElementById("f-unit").value === "week" ? "week" : "day",
       checklist: draftSubs
     });
@@ -2395,7 +2437,7 @@ textarea { resize: vertical; min-height: 64px; }
     if (!q) return { events: [], tasks: [] };
     var evs = events.filter(function (e) {
       return inScope(e.date) && ((e.title || "").toLowerCase().indexOf(q) >= 0 || (e.place || "").toLowerCase().indexOf(q) >= 0 ||
-        (e.notes || "").toLowerCase().indexOf(q) >= 0 || e.date.indexOf(q) >= 0);
+        (e.notes || "").toLowerCase().indexOf(q) >= 0 || e.date.indexOf(q) >= 0 || (e.tz || "").toLowerCase().indexOf(q) >= 0);
     }).sort(function (a, b) { return a.date < b.date ? -1 : a.date > b.date ? 1 : (a.start < b.start ? -1 : 1); });
     var tks = tasks.filter(function (t) {
       return inScope(t.date) && ((t.title || "").toLowerCase().indexOf(q) >= 0 || t.date.indexOf(q) >= 0 ||
