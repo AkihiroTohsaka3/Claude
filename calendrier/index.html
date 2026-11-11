@@ -445,7 +445,7 @@ textarea { resize: vertical; min-height: 64px; }
       <div class="grid2"><input type="number" id="f-n" min="1" max="365" value="2" inputmode="numeric"><div class="opts" id="unit-chips"></div></div>
     </div>
     <div class="field" id="until-wrap" hidden>Fin de la répétition (facultatif) <button type="button" class="pick" id="btn-until"></button></div>
-    <div class="field">Rappel
+    <div class="field">Rappels (plusieurs possibles)
       <div class="opts" id="rem-chips"></div>
     </div>
     <div class="field" id="buffers">Trajet ou pause
@@ -652,6 +652,7 @@ textarea { resize: vertical; min-height: 64px; }
       allDay: !!e.allDay, endDate: e.endDate || null, place: e.place || "", notes: e.notes || "",
       color: e.color || COLORS[0], rule: e.rule || null, until: e.until || null, skip: Array.isArray(e.skip) ? e.skip : [],
       every: +e.every || 1, unit: e.unit === "week" ? "week" : "day", tz: typeof e.tz === "string" ? e.tz : "",
+      reminds: Array.isArray(e.reminds) ? e.reminds.map(Number).filter(function (n) { return n > 0; }) : (e.remind ? [+e.remind] : []),
       bBefore: +e.bBefore || 0, bAfter: +e.bAfter || 0, remind: +e.remind || 0, checklist: Array.isArray(e.checklist) ? e.checklist : []
     };
   }
@@ -2228,6 +2229,13 @@ textarea { resize: vertical; min-height: 64px; }
   }
 
   // startMin : minutes depuis minuit (ou null). k : date ou occurrence.
+  var REMIND_OPTS = [{ value: 10, label: "10 min" }, { value: 30, label: "30 min" }, { value: 60, label: "1 h" }, { value: 1440, label: "La veille" }];
+  var reminds = [];
+  function renderRemind() {
+    Array.prototype.forEach.call(document.getElementById("rem-chips").querySelectorAll("[data-m]"), function (b) {
+      b.setAttribute("aria-pressed", reminds.indexOf(+b.getAttribute("data-m")) >= 0 ? "true" : "false");
+    });
+  }
   function openSheet(k, master, startMin, fromTask) {
     editingId = master ? master.id : null;
     editingOcc = master && master.rule ? k : null;
@@ -2251,6 +2259,7 @@ textarea { resize: vertical; min-height: 64px; }
     el.fBBefore.value = String(ev ? ev.bBefore : 0);
     el.fBAfter.value = String(ev ? ev.bAfter : 0);
     document.getElementById("f-remind").value = String(ev ? ev.remind : 0);
+    reminds = ev && ev.reminds ? ev.reminds.slice() : [];
     document.getElementById("f-n").value = String(ev && ev.every ? ev.every : 2);
     document.getElementById("f-unit").value = ev && ev.unit === "week" ? "week" : "day";
     el.fPlace.value = ev ? (ev.place || "") : "";
@@ -2264,6 +2273,7 @@ textarea { resize: vertical; min-height: 64px; }
     el.dup.hidden = !ev;
     setStatus("", false);
     closeDialog(el.drawer);
+    renderRemind();
     syncFields();
     openDialog(el.sheet);
   }
@@ -2298,7 +2308,7 @@ textarea { resize: vertical; min-height: 64px; }
       rule: allDay && endDate ? null : rule, until: allDay && endDate ? null : until,
       skip: previous ? previous.skip : [],
       bBefore: allDay ? 0 : +el.fBBefore.value, bAfter: allDay ? 0 : +el.fBAfter.value,
-      remind: +document.getElementById("f-remind").value || 0,
+      remind: reminds.length ? reminds[0] : 0, reminds: reminds.slice(),
       tz: document.getElementById("f-tz").value.trim(),
       every: +document.getElementById("f-n").value || 1, unit: document.getElementById("f-unit").value === "week" ? "week" : "day",
       checklist: draftSubs
@@ -2497,7 +2507,11 @@ textarea { resize: vertical; min-height: 64px; }
     events.forEach(function (e) {
       lines.push("BEGIN:VEVENT", "UID:" + e.id + "@calendrier", "DTSTAMP:" + stamp(), "SUMMARY:" + icsEscape(e.title));
       if (e.allDay) lines.push("DTSTART;VALUE=DATE:" + icsKey(e.date), "DTEND;VALUE=DATE:" + icsKey(nextKey(e.endDate || e.date)));
+      else if (e.tz) lines.push("DTSTART;TZID=" + e.tz + ":" + icsDateTime(e.date, e.start), "DTEND;TZID=" + e.tz + ":" + icsDateTime(e.date, e.end));
       else lines.push("DTSTART:" + icsDateTime(e.date, e.start), "DTEND:" + icsDateTime(e.date, e.end));
+      (e.reminds || []).forEach(function (r) {
+        lines.push("BEGIN:VALARM", "ACTION:DISPLAY", "DESCRIPTION:" + icsEscape(e.title), "TRIGGER:-PT" + r + "M", "END:VALARM");
+      });
       if (e.rule) {
         var rr = e.rule === "every" ? (e.unit === "week" ? "FREQ=WEEKLY" : "FREQ=DAILY") + ";INTERVAL=" + (e.every || 1) : RRULES[e.rule];
         if (e.until) rr += ";UNTIL=" + icsKey(e.until);
@@ -2687,9 +2701,17 @@ textarea { resize: vertical; min-height: 64px; }
     durBox.appendChild(b);
   });
   optGroup(document.getElementById("unit-chips"), [{ value: "day", label: "jours" }, { value: "week", label: "semaines" }], document.getElementById("f-unit"), null);
-  optGroup(document.getElementById("rem-chips"), [
-    { value: "0", label: "Aucun" }, { value: "10", label: "10 min" }, { value: "30", label: "30 min" }, { value: "60", label: "1 h" }
-  ], document.getElementById("f-remind"), null);
+  REMIND_OPTS.forEach(function (o) {
+    var b = el_("button", "opt", o.label);
+    b.type = "button";
+    b.setAttribute("data-m", String(o.value));
+    b.addEventListener("click", function () {
+      var v = o.value, i = reminds.indexOf(v);
+      if (i >= 0) reminds.splice(i, 1); else reminds.push(v);
+      renderRemind();
+    });
+    document.getElementById("rem-chips").appendChild(b);
+  });
 
   // Horloge mondiale : heure actuelle dans les fuseaux choisis (Intl, sans réseau).
   function zoneTime(z) {
@@ -2759,10 +2781,12 @@ textarea { resize: vertical; min-height: 64px; }
   function checkReminders() {
     var now = new Date(), nowMin = now.getHours() * 60 + now.getMinutes(), todayK = keyOf(now);
     eventsOn(todayK).forEach(function (ev) {
-      if (ev.allDay || !ev.remind) return;
+      if (ev.allDay || !ev.reminds || !ev.reminds.length) return;
       var st = toMin(ev.start);
-      if (nowMin < st - ev.remind || nowMin >= st) return;
-      var key = ev.id + "|" + todayK + "|" + ev.start;
+      if (nowMin >= st) return;
+      var due = ev.reminds.filter(function (r) { return nowMin >= st - r; });
+      if (!due.length) return;
+      var key = ev.id + "|" + todayK + "|" + ev.start + "|" + Math.max.apply(null, due);
       if (notified[key]) return;
       notified[key] = true;
       var msg = "Dans " + (st - nowMin) + " min : " + ev.title + (ev.place ? " · " + ev.place : "");
