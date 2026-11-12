@@ -265,6 +265,7 @@ document.addEventListener("keydown", function (e) {
   else if (e.key === "ArrowLeft") step(-1);
   else if (e.key === "ArrowRight") step(1);
   else if (e.key === "n") openSheet(keyOf(state.cursor), null, null);
+  else if (e.key === "v") openVoice();
   else if (e.key === "/") { e.preventDefault(); el.searchBtn.click(); }
 });
 

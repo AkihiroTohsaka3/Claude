@@ -14,6 +14,9 @@
     <button type="button" class="btn primary create" id="create">
       <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>Créer un événement
     </button>
+    <button type="button" class="btn create voice-open" id="voice-side">
+      <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6"/></svg>Dicter ma journée
+    </button>
     <section class="mini" id="mini" aria-label="Mini-calendrier"></section>
     <section class="side-sec">
       <h2>À venir</h2>
@@ -87,6 +90,9 @@
   </div>
 </div>
 
+<button type="button" class="fab fab-voice" id="voice-fab" aria-label="Dicter ma journée">
+  <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6"/></svg>
+</button>
 <button type="button" class="fab" id="fab" aria-label="Nouvel événement">
   <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
 </button>
@@ -260,9 +266,76 @@
         <div><dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>Période précédente ou suivante</dd></div>
         <div><dt><kbd>T</kbd></dt><dd>Revenir à aujourd'hui</dd></div>
         <div><dt><kbd>N</kbd></dt><dd>Nouvel événement</dd></div>
+        <div><dt><kbd>V</kbd></dt><dd>Dicter ma journée</dd></div>
         <div><dt><kbd>/</kbd></dt><dd>Rechercher</dd></div>
       </dl>
     </div>
+  </div>
+</dialog>
+
+<!-- Ma journée à la voix -->
+<dialog id="voice" class="sheet" aria-labelledby="voiceTitle">
+  <div class="sheet-form voice-form">
+    <div class="grab" aria-hidden="true"></div>
+    <div class="sheet-head">
+      <h2 id="voiceTitle">Ma journée à la voix</h2>
+      <button type="button" class="btn icon" id="voice-close" aria-label="Fermer">&times;</button>
+    </div>
+
+    <section class="vstep" id="v-compose" aria-label="Raconter sa journée">
+      <div class="opts" id="v-days" role="group" aria-label="Jour à organiser"></div>
+      <div class="vmic-wrap">
+        <button type="button" class="vmic" id="v-mic" aria-pressed="false" aria-label="Dicter" aria-describedby="v-mic-label">
+          <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6"/></svg>
+        </button>
+        <p class="vmic-label" id="v-mic-label">Appuie et raconte ta journée</p>
+      </div>
+      <label class="field">Ce que tu as à faire
+        <textarea id="v-text" rows="5" maxlength="4000" placeholder="Ex. « Cours de maths de 8 h à 10 h, ensuite réviser la physique deux heures, déjeuner avec Léa à midi et demi, sport en fin d'après-midi, et penser à appeler maman. »"></textarea>
+      </label>
+      <p class="vpartial" id="v-partial" aria-live="polite"></p>
+      <p class="hint" id="v-context"></p>
+      <label class="switch-row">
+        <span>Ajouter les repas et des pauses</span>
+        <input type="checkbox" class="switch" id="v-extras" role="switch" checked>
+      </label>
+      <p class="status" id="v-status" role="status"></p>
+      <div class="sheet-actions">
+        <button type="button" class="btn" id="v-clear">Effacer</button>
+        <span class="spacer"></span>
+        <button type="button" class="btn primary" id="v-go">Créer mon emploi du temps</button>
+      </div>
+    </section>
+
+    <section class="vstep vthink" id="v-think" aria-live="polite" hidden>
+      <div class="vdots" aria-hidden="true"><i></i><i></i><i></i></div>
+      <p id="v-think-text">Claude organise ta journée…</p>
+      <button type="button" class="btn small" id="v-stop">Arrêter</button>
+    </section>
+
+    <section class="vstep" id="v-preview" aria-label="Emploi du temps proposé" hidden>
+      <p class="vsum" id="v-sum"></p>
+      <ul class="vnotes" id="v-notes"></ul>
+      <div class="vp-list" id="v-blocks"></div>
+      <p class="menu-title" id="v-tasks-title">À faire, sans horaire</p>
+      <div class="vp-list" id="v-tasks"></div>
+      <div class="vfix" id="v-fixbox">
+        <p class="hint">Une correction ? Dis-la ou écris-la : « décale le sport à 18 h », « enlève la pause ».</p>
+        <div class="vfix-row">
+          <button type="button" class="btn icon vmic-sm" id="v-fix-mic" aria-pressed="false" aria-label="Dicter une correction"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6"/></svg></button>
+          <input type="text" id="v-fix" maxlength="400" placeholder="Ta correction" aria-label="Correction à apporter">
+          <button type="button" class="btn small" id="v-fix-go">Corriger</button>
+        </div>
+        <p class="vpartial" id="v-fix-partial" aria-live="polite"></p>
+      </div>
+      <p class="hint" id="v-source"></p>
+      <p class="status" id="v-status2" role="status"></p>
+      <div class="sheet-actions v-actions">
+        <button type="button" class="btn" id="v-back">Modifier le récit</button>
+        <button type="button" class="btn" id="v-listen" hidden>Écouter</button>
+        <button type="button" class="btn primary" id="v-add">Ajouter au calendrier</button>
+      </div>
+    </section>
   </div>
 </dialog>
 
@@ -291,6 +364,7 @@
 <script src="js/side.js"></script>
 <script src="js/sheet.js"></script>
 <script src="js/ics.js"></script>
+<script src="js/voice.js"></script>
 <script src="js/main.js"></script>
 </body>
 </html>
