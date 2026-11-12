@@ -18,6 +18,10 @@
       <div class="actions">
         <button type="button" class="btn icon" id="prev" aria-label="Précédent"><span class="nav-arrow" aria-hidden="true">&lsaquo;</span></button>
         <button type="button" class="btn icon" id="next" aria-label="Suivant"><span class="nav-arrow" aria-hidden="true">&rsaquo;</span></button>
+        <button type="button" class="btn icon today-btn" id="today" aria-label="Revenir à aujourd'hui">
+          <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M4 10h16M9 3v4M15 3v4"/></svg>
+          <span id="today-num" aria-hidden="true"></span>
+        </button>
         <button type="button" class="btn icon" id="search-btn" aria-label="Rechercher">
           <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
         </button>
@@ -32,13 +36,12 @@
         <button type="button" role="tab" data-view="week" aria-selected="false">Semaine</button>
         <button type="button" role="tab" data-view="month" aria-selected="true">Mois</button>
         <button type="button" role="tab" data-view="year" aria-selected="false">Année</button>
-        <button type="button" role="tab" data-view="agenda" aria-selected="false">Programme</button>
+        <button type="button" role="tab" data-view="agenda" aria-selected="false">Planning</button>
       </div>
-      <button type="button" class="btn" id="today">Aujourd'hui</button>
     </div>
     <div class="filters" id="filters" role="group" aria-label="Filtres"></div>
   </header>
-  <main id="view" class="panel" aria-live="polite"></main>
+  <main id="view" class="panel"></main>
 </div>
 
 <div class="pomo" id="pomo" role="timer" aria-label="Minuteur Pomodoro" hidden>
