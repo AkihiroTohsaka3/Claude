@@ -157,19 +157,40 @@ function toggleMic(target) {
   }
   if (SR) startWebSpeech(target);
 }
+// Fusionne des morceaux de dictée : un morceau qui reprend le précédent en le prolongeant le remplace,
+// un morceau qui répète la fin du texte est ignoré, un morceau nouveau est ajouté à la suite.
+function mergeSpeech(parts) {
+  var acc = "";
+  parts.forEach(function (p) {
+    p = String(p || "").replace(/\s+/g, " ").trim();
+    if (!p) return;
+    var a = acc.toLowerCase(), b = p.toLowerCase();
+    if (!acc || b.indexOf(a) === 0) acc = p;
+    else if (a.slice(-b.length) === b) return;
+    else acc += " " + p;
+  });
+  return acc;
+}
 function startWebSpeech(target) {
   var rec;
   try { rec = new SR(); } catch (e) { SR = null; drawMic(); return; }
   rec.lang = "fr-FR";
   rec.continuous = true;
   rec.interimResults = true;
+  // Le texte dicté est reconstruit à chaque fois à partir de tous les résultats : Chrome sur Android
+  // renvoie chaque version de la phrase (« demain », « demain j'ai »…) comme un résultat définitif,
+  // alors que Chrome sur ordinateur envoie des morceaux qui se suivent. Les deux cas sont fusionnés.
+  var base = target.value;
   rec.onresult = function (ev) {
-    var interim = "";
-    for (var i = ev.resultIndex; i < ev.results.length; i++) {
-      var r = ev.results[i];
-      if (r.isFinal) appendSpeech(r[0].transcript); else interim += r[0].transcript;
+    var said = mergeSpeech(Array.prototype.map.call(ev.results, function (r) { return r.isFinal ? r[0].transcript : ""; }));
+    var last = ev.results[ev.results.length - 1], interim = last && !last.isFinal ? last[0].transcript : "";
+    if (said) {
+      var sep = !base.trim() ? "" : /\s$/.test(base) ? "" : " ";
+      target.value = ((base.trim() ? base : "") + sep + said).slice(0, target.maxLength > 0 ? target.maxLength : 4000);
+      if (target === vEl.text) saveVoiceDraft();
+      updateGo();
     }
-    showPartial(interim);
+    showPartial(mergeSpeech([said, interim]) === said ? "" : interim);
   };
   rec.onerror = function (ev) {
     if (ev.error === "not-allowed" || ev.error === "service-not-allowed") { dict.denied = true; dict.deniedBy = "web"; voiceStatus("Micro refusé par le navigateur : utilise le micro de ton clavier, ou autorise le micro pour cette page.", true); }
