@@ -390,3 +390,33 @@ function showUndo(text, undo) {
 }
 function hideUndo() { undoAction = null; el.snack.hidden = true; clearTimeout(snackTimer); }
 el.snackUndo.addEventListener("click", function () { var fn = undoAction; hideUndo(); if (fn) fn(); });
+
+// Dictée vocale : disponible seulement quand la page est ouverte dans Claude. Sinon le bouton reste caché.
+(function () {
+  var btn = document.getElementById("mic-btn");
+  if (!btn || !window.claude || typeof window.claude.use !== "function") return;
+  window.claude.use("dictation").then(function (d) {
+    if (!d) return;
+    btn.hidden = false;
+    var base = "";
+    d.onPartial(function (e) { el.fNlp.value = (base + " " + e.text).trim(); });
+    d.onFinal(function (e) { base = (base + " " + e.text).trim(); el.fNlp.value = base; });
+    d.onState(function (e) {
+      var on = e.state === "listening" || e.state === "starting";
+      btn.setAttribute("aria-pressed", on ? "true" : "false");
+      btn.setAttribute("aria-label", on ? "Arrêter la dictée" : "Dicter une phrase");
+      if (e.state === "idle") {
+        if (e.reason === "not_granted") { btn.hidden = true; return; }
+        if (el.fNlp.value.trim()) applyNatural();
+      }
+    });
+    btn.addEventListener("click", function () {
+      if (d.active()) { d.stop().catch(function () {}); return; }
+      base = el.fNlp.value.trim();
+      d.start({ language: "fr-FR" }).catch(function (err) {
+        if (err && err.code === "not_granted") btn.hidden = true;
+        else setStatus("Dictée indisponible pour le moment. Tu peux taper la phrase.", true);
+      });
+    });
+  });
+})();

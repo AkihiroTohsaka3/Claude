@@ -495,3 +495,6 @@ kbd { font: inherit; font-size: 0.78rem; font-weight: 600; padding: 1px 6px; bor
   .today-txt { display: inline; }
   .tabs button svg.i { display: block; width: 18px; height: 18px; }
 }
+.nlp-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; align-items: center; }
+.mic[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); border-color: transparent; animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 50% { box-shadow: 0 0 0 6px var(--accent-soft); } }

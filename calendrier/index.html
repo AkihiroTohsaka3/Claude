@@ -104,10 +104,15 @@
       <h2 id="sheetTitle">Nouvel événement</h2>
       <button type="button" class="btn icon" id="close" aria-label="Fermer">&times;</button>
     </div>
-    <label class="nlp">
-      <span class="hint">Saisie rapide : « Dentiste demain à 14h30 »</span>
-      <input type="text" id="f-nlp" placeholder="Tape une phrase, puis Entrée">
-    </label>
+    <div class="nlp">
+      <label class="hint" for="f-nlp">Saisie rapide : « Dentiste demain à 14h30 »</label>
+      <div class="nlp-row">
+        <input type="text" id="f-nlp" placeholder="Tape ou dicte une phrase, puis Entrée">
+        <button type="button" class="btn icon mic" id="mic-btn" aria-label="Dicter une phrase" aria-pressed="false" hidden>
+          <svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+        </button>
+      </div>
+    </div>
     <label class="field">Titre <input type="text" id="f-title" maxlength="80" placeholder="Ex. Rendez-vous dentiste"></label>
     <label class="switch-row">
       <span>Journée entière</span>
