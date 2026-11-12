@@ -173,6 +173,8 @@ function startWebSpeech(target) {
   };
   rec.onerror = function (ev) {
     if (ev.error === "not-allowed" || ev.error === "service-not-allowed") { dict.denied = true; dict.deniedBy = "web"; voiceStatus("Micro refusé par le navigateur : utilise le micro de ton clavier, ou autorise le micro pour cette page.", true); }
+    // « network » : le navigateur n'a pas de service de dictée (Brave, par exemple) → micro du clavier.
+    else if (ev.error === "network" || ev.error === "audio-capture" || ev.error === "language-not-supported") { SR = null; voiceStatus("Ce navigateur ne fait pas la dictée lui-même : appuie sur le micro, puis sur 🎤 de ton clavier.", true); }
     else if (ev.error === "no-speech") voiceStatus("Je n'ai rien entendu. Appuie sur le micro et parle.", true);
     else if (ev.error !== "aborted") voiceStatus("La dictée a eu un souci (" + ev.error + "). Réessaie.", true);
   };
