@@ -107,8 +107,20 @@ function setMicState(st, reason) {
   }
   drawMic();
 }
+// L'arrêt est toujours envoyé (il ne coûte rien si la dictée est déjà arrêtée), et le bouton
+// revient au repos même si la dictée ne le confirme pas.
+var stopGuard = null;
 function stopDictation() {
-  if (dict.claude && dict.claude.active()) dict.claude.stop().catch(function () {});
+  if (dict.claude) {
+    var listening = dict.state !== "idle";
+    if (listening) setMicState("finishing");
+    var settle = function () {
+      clearTimeout(stopGuard);
+      stopGuard = setTimeout(function () { if (dict.state !== "idle") setMicState("idle"); }, 400);
+    };
+    try { Promise.resolve(dict.claude.stop()).then(settle, settle); } catch (e) { settle(); }
+    if (listening) { clearTimeout(stopGuard); stopGuard = setTimeout(function () { if (dict.state !== "idle") setMicState("idle"); }, 4000); }
+  }
   if (dict.web) { try { dict.web.stop(); } catch (e) { /* ignoré */ } }
 }
 // À appeler directement depuis l'appui sur le micro : la dictée doit démarrer sans attendre.
@@ -118,6 +130,7 @@ function toggleMic(target) {
     stopDictation();
     if (same) return;
   }
+  clearTimeout(stopGuard);
   if (tts && voice.speaking) tts.stop();
   dict.target = target;
   voiceStatus("");
