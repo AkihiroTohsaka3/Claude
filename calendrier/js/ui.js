@@ -264,7 +264,7 @@ function evButton(ev) {
   b.appendChild(el_("b", null, ev.title));
   var done = ev.checklist ? ev.checklist.filter(function (s) { return s.done; }).length : 0;
   b.appendChild(el_("small", null, (ev.lock ? "🔒 " : "") + timeLabel(ev) + (ev.place ? " · " + ev.place : "") + repLabel(ev) +
-    (ev.checklist && ev.checklist.length ? " · " + done + "/" + ev.checklist.length + " étapes" : "") + (ev.tz ? " · " + ev.tz.split("/").pop().replace(/_/g, " ") : "")));
+    (ev.checklist && ev.checklist.length ? " · " + done + "/" + ev.checklist.length + " étapes" : "") + (ev.tz ? " · " + ev.tz.split("/").pop().replace(/_/g, " ") : "") + (isFixed(ev) ? " · fixe" : "")));
   b.addEventListener("click", function (e) { e.stopPropagation(); if (suppressClick) return; openSheet(ev.occDate, masterOf(ev.id), null); });
   return b;
 }

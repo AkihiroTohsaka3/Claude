@@ -84,6 +84,7 @@ function bindEventMove(btn, id, fromK) {
 function moveEventTo(id, targetK, fromK) {
   var ev = masterOf(id);
   if (!ev) return;
+  if (isFixed(ev)) { fixedNotice(ev); refresh(); return; }
   var offerUndo = undoPoint("Événement déplacé au " + shortDay(targetK));
   if (ev.rule) {
     // Occurrence d'une série : elle est retirée de la série et recréée ponctuellement au nouveau jour.
@@ -272,6 +273,7 @@ function bindEventDrag(b, p, k) {
     suppressClick = true;
     setTimeout(function () { suppressClick = false; }, 350);
     var ev = commit && g.moved && (sn || dayChanged) ? masterOf(p.ev.id) : null;
+    if (isFixed(ev)) { fixedNotice(ev); refresh(); return; }
     if (!ev) { refresh(); return; }
     var offerUndo = undoPoint(g.mode === "move" ? "Événement déplacé" : "Durée modifiée");
     if (ev.rule) {

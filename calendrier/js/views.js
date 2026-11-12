@@ -163,7 +163,7 @@ function renderWeekList(dates, keys) {
     list.forEach(function (ev) {
       var eb = evButton(ev);
       col.appendChild(eb);
-      bindEventMove(eb, ev.id, k);
+      if (!isFixed(ev)) bindEventMove(eb, ev.id, k);
     });
     if (tks.length) {
       var tl = el_("div", "wtasks");
@@ -214,7 +214,7 @@ function renderWeekGrid(dates, keys) {
       var node = evButton(ev), from = i, to = i;
       if (multi) { to = ev.endDate > keys[n - 1] ? n - 1 : Math.max(i, keys.indexOf(ev.endDate)); }
       node.style.gridColumn = (from + 2) + " / " + (to + 3);
-      bindEventMove(node, ev.id, k);
+      if (!isFixed(ev)) bindEventMove(node, ev.id, k);
       all.appendChild(node);
       count++;
     });
@@ -548,7 +548,7 @@ function dayColumn(k) {
       var grip = el_("span", "grip");
       grip.setAttribute("aria-hidden", "true");
       b.appendChild(grip);
-      bindEventDrag(b, p, k);
+      if (isFixed(p.ev)) grip.hidden = true; else bindEventDrag(b, p, k);
       b.addEventListener("click", function (e) {
         e.stopPropagation();
         if (suppressClick) return;

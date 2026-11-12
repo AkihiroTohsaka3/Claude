@@ -140,11 +140,26 @@ function saveSettings() { settings.mod = Date.now(); writeStore(KEY_SET, JSON.st
 function dowIdx(d) { return (d.getDay() - settings.weekStart + 7) % 7; }
 function weekLabels() { var out = []; for (var i = 0; i < 7; i++) out.push(DAYS_SHORT[(i + (settings.weekStart === 0 ? 6 : 0)) % 7]); return out; }
 
-var events = loadEvents();
+// ---------- Événements fixes ----------
+// Écrits dans le code : présents pour tous ceux qui ouvrent le calendrier, et impossibles à modifier,
+// déplacer ou supprimer dans l'application. Ils sont dans `events` comme les autres (AnkiLock les lit).
+var FIXED_EVENTS = [
+  { id: "fixe-dormir", title: "Dormir", date: "2020-01-01", start: "01:00", end: "04:00", rule: "daily", lock: true, color: COLORS[4] },
+  { id: "fixe-revision", title: "Révision", date: "2020-01-01", start: "18:30", end: "19:30", rule: "weekdays", lock: true, color: COLORS[1] }
+];
+var FIXED_IDS = {};
+FIXED_EVENTS.forEach(function (f) { FIXED_IDS[f.id] = true; });
+function isFixed(ev) { return !!(ev && FIXED_IDS[ev.id]); }
+// Remet les événements fixes tels que définis ici, quelle que soit la copie enregistrée ou reçue.
+function withFixed(list) {
+  return list.filter(function (e) { return !FIXED_IDS[e.id]; }).concat(FIXED_EVENTS.map(function (f) { return normalize(f); }));
+}
+
+var events = withFixed(loadEvents());
 var tasks = loadTasks();
 Sync.prime("events", events);
 Sync.prime("tasks", tasks);
-function saveEvents() { Sync.track("events", events); return writeStore(KEY_EVENTS, JSON.stringify(events)); }
+function saveEvents() { events = withFixed(events); Sync.track("events", events); return writeStore(KEY_EVENTS, JSON.stringify(events)); }
 function saveTasks() { Sync.track("tasks", tasks); return writeStore(KEY_TASKS, JSON.stringify(tasks)); }
 // Événements d'un jour sans tenir compte des filtres (conflits, mini-calendrier).
 function rawEventsOn(k) { return events.filter(function (e) { return occursOn(e, k); }); }

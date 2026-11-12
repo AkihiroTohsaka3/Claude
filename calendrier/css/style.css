@@ -558,3 +558,4 @@ kbd { font: inherit; font-size: 0.78rem; font-weight: 600; padding: 1px 6px; bor
 .vlock svg.i { width: 18px; height: 18px; }
 .vlock[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
 .vmic[data-mode="keyboard"] { background: var(--surface-2); color: var(--accent); border: 1px solid var(--line); box-shadow: none; }
+.fixed-when { font-size: 1rem; font-weight: 600; font-variant-numeric: tabular-nums; }

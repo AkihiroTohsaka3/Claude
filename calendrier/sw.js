@@ -2,7 +2,7 @@
  * En ligne, on prend toujours la version la plus récente (et on la garde) ; hors ligne, la copie gardée.
  * Les données (événements, tâches) ne passent pas par ici : elles restent dans le stockage du navigateur. */
 "use strict";
-var CACHE = "calendrier-v3";
+var CACHE = "calendrier-v4";
 var FILES = [
   "./", "index.html", "manifest.webmanifest", "css/style.css", "assets/bg.jpg",
   "js/sync.js", "js/core.js", "js/ui.js", "js/gestures.js", "js/views.js", "js/side.js", "js/sheet.js", "js/ics.js", "js/voice.js", "js/main.js",

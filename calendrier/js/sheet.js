@@ -254,7 +254,24 @@ function renderRemind() {
     b.setAttribute("aria-pressed", reminds.indexOf(+b.getAttribute("data-m")) >= 0 ? "true" : "false");
   });
 }
+// Un événement fixe ne s'ouvre pas en modification : on explique ce qu'il est.
+function showFixedInfo(ev) {
+  openPicker(ev.title, function (body) {
+    body.appendChild(el_("p", "fixed-when", timeLabel(ev) + " · " + RULE_LABELS[ev.rule]));
+    if (ev.lock) body.appendChild(el_("p", "notice", "🔒 Locker activé : le téléphone est bloqué pendant ce créneau."));
+    body.appendChild(el_("p", "hint", "Événement fixe : il fait partie de l'application et ne peut être ni modifié, ni déplacé, ni supprimé."));
+    var act = el_("div", "pick-actions");
+    act.appendChild(el_("span"));
+    var ok = el_("button", "btn primary", "Compris");
+    ok.type = "button";
+    ok.addEventListener("click", function () { closeDialog(el.picker); });
+    act.appendChild(ok);
+    body.appendChild(act);
+  });
+}
+function fixedNotice(ev) { showUndo("« " + ev.title + " » est un événement fixe : il ne peut pas être déplacé.", null); }
 function openSheet(k, master, startMin, fromTask) {
+  if (isFixed(master)) { showFixedInfo(master); return; }
   editingId = master ? master.id : null;
   editingOcc = master && master.rule ? k : null;
   armedBtn = null;

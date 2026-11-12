@@ -398,7 +398,7 @@ Sync.start({
   },
   status: showSync,
   apply: function (next) {
-    if (next.events) { events = next.events.map(normalize); writeStore(KEY_EVENTS, JSON.stringify(events)); Sync.prime("events", events); }
+    if (next.events) { events = withFixed(next.events.map(normalize)); writeStore(KEY_EVENTS, JSON.stringify(events)); Sync.prime("events", events); }
     if (next.tasks) { tasks = next.tasks.map(normalizeTask); writeStore(KEY_TASKS, JSON.stringify(tasks)); Sync.prime("tasks", tasks); }
     if (next.settings) {
       settings = cleanSettings(next.settings);
