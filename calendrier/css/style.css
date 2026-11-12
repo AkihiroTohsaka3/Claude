@@ -549,3 +549,12 @@ kbd { font: inherit; font-size: 0.78rem; font-weight: 600; padding: 1px 6px; bor
   .v-actions { display: flex; }
   .v-actions .btn.primary { order: 0; margin-left: auto; }
 }
+.lock-lbl { display: grid; gap: 1px; }
+.lock-lbl small { font-size: 0.76rem; color: var(--muted); }
+.vp-row { grid-template-columns: 24px 46px minmax(0, 1fr) auto; }
+.vp-row.task, .vp-row.fixed { grid-template-columns: 24px 46px minmax(0, 1fr); }
+.vp-row.task { grid-template-columns: 24px minmax(0, 1fr); }
+.vlock { display: grid; justify-items: center; gap: 1px; min-width: 52px; min-height: 44px; padding: 4px 6px; border-radius: var(--r-sm); border: 1px solid var(--line); background: transparent; color: var(--muted); font-size: 0.64rem; font-weight: 650; }
+.vlock svg.i { width: 18px; height: 18px; }
+.vlock[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.vmic[data-mode="keyboard"] { background: var(--surface-2); color: var(--accent); border: 1px solid var(--line); box-shadow: none; }

@@ -266,6 +266,7 @@ function openSheet(k, master, startMin, fromTask) {
   el.fNlp.value = "";
   el.fTitle.value = ev ? ev.title : (fromTask ? fromTask.title : "");
   el.fAllDay.checked = !!(ev && ev.allDay);
+  byId("f-lock").checked = !!(ev && ev.lock);
   el.fDate.value = ev ? ev.date : k;
   var start = ev ? ev.start : (startMin != null ? fromMin(startMin) : "09:00");
   var end = ev ? ev.end : fromMin(toMin(start) + settings.dur);
@@ -331,7 +332,7 @@ el.form.addEventListener("submit", function (e) {
     remindAt: document.getElementById("f-remindat").value || "",
     tz: document.getElementById("f-tz").value.trim(),
     every: +document.getElementById("f-n").value || 1, unit: document.getElementById("f-unit").value === "week" ? "week" : "day",
-    checklist: draftSubs
+    checklist: draftSubs, lock: byId("f-lock").checked
   });
   if (editingId) events = events.map(function (x) { return x.id === editingId ? data : x; });
   else events.push(data);

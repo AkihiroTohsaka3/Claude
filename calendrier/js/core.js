@@ -84,7 +84,7 @@ function normalize(e) {
     every: +e.every || 1, unit: e.unit === "week" ? "week" : "day", tz: typeof e.tz === "string" ? e.tz : "",
     remindAt: /^\d{2}:\d{2}$/.test(e.remindAt || "") ? e.remindAt : "",
     reminds: Array.isArray(e.reminds) ? e.reminds.map(Number).filter(function (n) { return n > 0; }) : (e.remind ? [+e.remind] : []),
-    bBefore: +e.bBefore || 0, bAfter: +e.bAfter || 0, remind: +e.remind || 0, checklist: Array.isArray(e.checklist) ? e.checklist : [],
+    bBefore: +e.bBefore || 0, bAfter: +e.bAfter || 0, remind: +e.remind || 0, checklist: Array.isArray(e.checklist) ? e.checklist : [], lock: !!e.lock,
     mod: +e.mod || 0
   };
 }

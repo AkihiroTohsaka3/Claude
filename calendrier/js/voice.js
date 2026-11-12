@@ -10,6 +10,8 @@
 var KEY_VOICE = "cal-voice-draft-v1";
 // Type d'activité → catégorie (couleur) du calendrier.
 var VOICE_TYPES = { rdv: 0, perso: 0, etudes: 1, travail: 1, pratique: 2, trajet: 2, sport: 3, loisir: 3, repas: 4, pause: 4, sante: 4 };
+// Sans avis de Claude (planificateur local), le Locker est activé pour les études et le travail.
+var LOCK_TYPES = { etudes: true, travail: true };
 var VOICE_LABELS = {
   rdv: "Rendez-vous", perso: "Perso", etudes: "Études", travail: "Travail", pratique: "Pratique", trajet: "Trajet",
   sport: "Sport", loisir: "Loisir", repas: "Repas", pause: "Pause", sante: "Santé"
@@ -43,8 +45,10 @@ function voiceStatus(msg, isError, box) {
 }
 
 // ---------- Dictée ----------
-var SR = window.SpeechRecognition || window.webkitSpeechRecognition || null;
-var dict = { claude: null, ready: !(window.claude && window.claude.use), web: null, state: "idle", target: null, denied: false, frOff: false };
+// Dans Claude, la page ne peut pas ouvrir le micro elle-même : sans la dictée de Claude
+// (applications mobiles, Safari…), on passe par le micro du clavier du téléphone.
+var SR = window.claude ? null : (window.SpeechRecognition || window.webkitSpeechRecognition || null);
+var dict = { claude: null, ready: !(window.claude && window.claude.use), web: null, state: "idle", target: null, denied: false, deniedBy: "", frOff: false };
 
 useCap("dictation").then(function (d) {
   dict.ready = true;
@@ -79,20 +83,22 @@ var MIC_TEXT = {
 };
 function drawMic() {
   var on = dict.state !== "idle";
-  var avail = micAvailable();
+  var avail = micAvailable(), kb = dict.ready && !avail;
   [vEl.mic, vEl.fixMic].forEach(function (b) {
     var mine = on && (b === vEl.mic ? dict.target === vEl.text : dict.target === vEl.fix);
     b.setAttribute("aria-pressed", mine ? "true" : "false");
     b.setAttribute("data-state", mine ? dict.state : "idle");
+    b.setAttribute("data-mode", kb ? "keyboard" : "");
   });
-  vEl.mic.hidden = !avail && dict.ready;
-  vEl.fixMic.hidden = !avail;
+  vEl.mic.setAttribute("aria-label", kb ? "Dicter avec le micro du clavier" : "Dicter");
+  vEl.mic.hidden = false;
+  vEl.fixMic.hidden = false;
   if (!dict.ready && !SR) { vEl.mic.disabled = true; vEl.micLabel.textContent = "Préparation du micro…"; return; }
   vEl.mic.disabled = false;
-  if (!avail) {
-    vEl.micLabel.textContent = dict.denied
-      ? "Micro non autorisé : écris ta journée ci-dessous (ou utilise le micro de ton clavier)."
-      : "Dictée indisponible dans ce navigateur : écris ta journée, ou utilise le micro de ton clavier.";
+  if (kb) {
+    vEl.micLabel.textContent = dict.denied && dict.deniedBy === "claude"
+      ? "Micro refusé pour cette page (tu peux l'autoriser dans ses autorisations). En attendant : appuie ici, puis sur 🎤 de ton clavier."
+      : "Ici, la dictée passe par ton clavier : appuie sur le micro, puis sur 🎤 du clavier et parle.";
     return;
   }
   vEl.micLabel.textContent = dict.target === vEl.text || !on ? MIC_TEXT[on ? dict.state : "idle"] : MIC_TEXT.idle;
@@ -101,7 +107,7 @@ function setMicState(st, reason) {
   dict.state = st;
   if (st === "idle") {
     showPartial("");
-    if (reason === "not_granted") dict.denied = true;
+    if (reason === "not_granted") { dict.denied = true; dict.deniedBy = "claude"; }
     var msg = { hidden: "Dictée interrompue quand la page a été masquée.", time_limit: "Dictée arrêtée au bout d'une heure.", rate_limited: "Trop de dictées en même temps : réessaie dans un instant.", upstream_error: "Le micro ou la dictée a eu un souci. Réessaie." }[reason];
     if (msg) voiceStatus(msg, true);
   }
@@ -131,6 +137,8 @@ function toggleMic(target) {
     if (same) return;
   }
   clearTimeout(stopGuard);
+  // Sans dictée possible ici : le champ prend le focus, le clavier s'ouvre avec son propre micro.
+  if (!micAvailable()) { target.focus(); return; }
   if (tts && voice.speaking) tts.stop();
   dict.target = target;
   voiceStatus("");
@@ -138,7 +146,7 @@ function toggleMic(target) {
     dict.claude.start(dict.frOff ? undefined : { language: "fr" }).catch(function (e) {
       var code = e && e.code;
       if (code === "stopped") return;
-      if (code === "not_granted") { dict.denied = true; drawMic(); target.focus(); return; }
+      if (code === "not_granted") { dict.denied = true; dict.deniedBy = "claude"; drawMic(); target.focus(); return; }
       if (code === "unavailable") {
         if (!dict.frOff) { dict.frOff = true; voiceStatus("Dictée en français indisponible ici. Appuie à nouveau sur le micro pour réessayer.", true); return; }
         dict.claude = null; drawMic(); return;
@@ -164,7 +172,7 @@ function startWebSpeech(target) {
     showPartial(interim);
   };
   rec.onerror = function (ev) {
-    if (ev.error === "not-allowed" || ev.error === "service-not-allowed") { dict.denied = true; voiceStatus("Micro refusé par le navigateur. Écris ta journée, ou autorise le micro pour cette page.", true); }
+    if (ev.error === "not-allowed" || ev.error === "service-not-allowed") { dict.denied = true; dict.deniedBy = "web"; voiceStatus("Micro refusé par le navigateur : utilise le micro de ton clavier, ou autorise le micro pour cette page.", true); }
     else if (ev.error === "no-speech") voiceStatus("Je n'ai rien entendu. Appuie sur le micro et parle.", true);
     else if (ev.error !== "aborted") voiceStatus("La dictée a eu un souci (" + ev.error + "). Réessaie.", true);
   };
@@ -196,7 +204,7 @@ vEl.listen.addEventListener("click", function () {
   var p = voice.plan, parts = [];
   if (p.summary) parts.push(p.summary);
   allRows(voice.day).forEach(function (r) {
-    if (r.fixed || r.keep) parts.push("À " + spokenTime(r.start) + ", " + r.title + (r.fixed ? ", déjà prévu." : "."));
+    if (r.fixed || r.keep) parts.push("À " + spokenTime(r.start) + ", " + r.title + (r.lock ? ", en Locker" : "") + (r.fixed ? ", déjà prévu." : "."));
   });
   var tk = p.tasks.filter(function (t) { return t.keep; }).map(function (t) { return t.title; });
   if (tk.length) parts.push("Sans horaire : " + tk.join(", ") + ".");
@@ -291,7 +299,7 @@ byId("voice-fab").addEventListener("click", function () { openVoice(); });
 function planForPrompt(p) {
   return JSON.stringify({
     blocks: p.blocks.filter(function (b) { return b.keep; }).map(function (b) {
-      return { title: b.title, start: fromMin(b.start), end: fromMin(b.end), type: b.type, place: b.place, note: b.note };
+      return { title: b.title, start: fromMin(b.start), end: fromMin(b.end), type: b.type, lock: b.lock, place: b.place, note: b.note };
     }),
     tasks: p.tasks.filter(function (t) { return t.keep; }).map(function (t) { return { title: t.title }; })
   });
@@ -331,10 +339,11 @@ function voicePrompt(text, k, extras, prev, fix) {
     : "4. N'ajoute rien qu'elle n'a pas demandé : ni repas, ni pause, sauf si elle en parle.");
   L.push("5. Ce qui ne demande pas de créneau (un rappel rapide, « penser à… », « ne pas oublier… ») ou qui ne rentre pas dans la journée va dans \"tasks\".");
   L.push("6. Titres courts en français (40 caractères au plus), avec une majuscule, sans l'heure. \"place\" seulement si elle dit un lieu ; \"note\" seulement si c'est utile (vide sinon).");
-  L.push("7. S'il manque une information importante, fais un choix raisonnable et signale-le en une phrase courte dans \"notes\" (2 au plus).");
+  L.push("7. \"lock\" (mode Locker : son téléphone sera bloqué pendant le bloc pour qu'elle reste concentrée) vaut true pour les blocs où elle doit se concentrer pour apprendre ou travailler : cours, révisions, devoirs, exercices, apprentissage, lecture pour étudier, travail de fond. Il vaut false pour tout le reste : repas, temps de midi, pauses, sport, loisirs, jeux vidéo (par exemple League of Legends), séries, appels, courses, trajets, rendez-vous, tâches pratiques. Si elle dit explicitement « en Locker » ou « sans Locker », suis ce qu'elle dit.");
+  L.push("8. S'il manque une information importante, fais un choix raisonnable et signale-le en une phrase courte dans \"notes\" (2 au plus).");
   L.push("");
   L.push("Réponds uniquement avec un objet JSON de cette forme :");
-  L.push('{"summary":"Une phrase qui résume sa journée, en la tutoyant.","blocks":[{"title":"Cours de maths","start":"08:00","end":"10:00","type":"etudes","place":"","note":""}],"tasks":[{"title":"Acheter du pain"}],"notes":[]}');
+  L.push('{"summary":"Une phrase qui résume sa journée, en la tutoyant.","blocks":[{"title":"Cours de maths","start":"08:00","end":"10:00","type":"etudes","lock":true,"place":"","note":""}],"tasks":[{"title":"Acheter du pain"}],"notes":[]}');
   L.push("\"type\" vaut l'un de : " + Object.keys(VOICE_TYPES).join(", ") + ".");
   return L.join("\n");
 }
@@ -416,7 +425,8 @@ function cleanPlan(raw, k, source) {
     if (have[id] || seen[id]) return;
     seen[id] = true;
     var type = Object.prototype.hasOwnProperty.call(VOICE_TYPES, b.type) ? b.type : "perso";
-    blocks.push({ title: cap(title), start: st, end: en, type: type, place: cleanText(b.place, 80), note: cleanText(b.note, 300), keep: true });
+    var lock = b.lock === true || b.lock === "true" ? true : b.lock === false || b.lock === "false" ? false : LOCK_TYPES[type] === true;
+    blocks.push({ title: cap(title), start: st, end: en, type: type, lock: lock, place: cleanText(b.place, 80), note: cleanText(b.note, 300), keep: true });
   });
   blocks.sort(function (a, b) { return a.start - b.start || a.end - b.end; });
   var known = {};
@@ -438,7 +448,7 @@ function allRows(k) {
   var rows = voice.plan.blocks.slice();
   rawEventsOn(k).forEach(function (e) {
     if (e.allDay) return;
-    rows.push({ title: e.title, start: toMin(e.start), end: endMin(e), color: colorOf(e), place: e.place, fixed: true });
+    rows.push({ title: e.title, start: toMin(e.start), end: endMin(e), color: colorOf(e), place: e.place, lock: e.lock, fixed: true });
   });
   return rows.sort(function (a, b) { return a.start - b.start || (a.fixed ? -1 : 1); });
 }
@@ -457,6 +467,17 @@ function keepButton(item, label) {
   c.setAttribute("aria-label", (item.keep ? "Ne pas garder : " : "Garder : ") + label);
   c.addEventListener("click", function () { item.keep = !item.keep; renderPreview(); });
   return c;
+}
+function lockButton(b) {
+  var btn = el_("button", "vlock");
+  btn.type = "button";
+  btn.setAttribute("aria-pressed", b.lock ? "true" : "false");
+  btn.setAttribute("aria-label", "Locker pour « " + b.title + " » : " + (b.lock ? "activé" : "désactivé"));
+  btn.title = b.lock ? "Locker activé : téléphone bloqué" : "Locker désactivé";
+  btn.appendChild(svgIcon(b.lock ? "M7 11V8a5 5 0 0 1 10 0v3M6 11h12v9H6z" : "M7 11V8a5 5 0 0 1 9.6-2M6 11h12v9H6z"));
+  btn.appendChild(el_("span", null, "Locker"));
+  btn.addEventListener("click", function () { b.lock = !b.lock; renderPreview(); });
+  return btn;
 }
 function renderPreview() {
   var p = voice.plan, k = voice.day;
@@ -482,12 +503,14 @@ function renderPreview() {
     var main = el_("span", "vp-main");
     main.appendChild(el_("b", null, r.title));
     var meta = r.fixed ? ["Déjà prévu"] : [VOICE_LABELS[r.type], fmtDur(r.end - r.start)];
+    if (r.fixed && r.lock) meta.push("🔒 Locker");
     if (r.place) meta.push(r.place);
     main.appendChild(el_("small", null, meta.join(" · ")));
     if (r.note) main.appendChild(el_("small", null, r.note));
     var other = !r.fixed && r.keep ? clashWith(r, rows) : null;
     if (other) main.appendChild(el_("small", "clash", "Chevauche « " + other.title + " »"));
     row.appendChild(main);
+    if (!r.fixed) row.appendChild(lockButton(r));
     vEl.blocks.appendChild(row);
   });
   vEl.tasks.innerHTML = "";
@@ -527,7 +550,7 @@ vEl.add.addEventListener("click", function () {
   if (tk.length) parts.push(plural(tk.length, "tâche", "tâches"));
   var offer = undoPoint("Journée organisée : " + parts.join(" et "));
   bl.forEach(function (b) {
-    events.push(normalize({ title: b.title, date: k, start: fromMin(b.start), end: fromMin(b.end), place: b.place, notes: b.note, color: COLORS[VOICE_TYPES[b.type]] }));
+    events.push(normalize({ title: b.title, date: k, start: fromMin(b.start), end: fromMin(b.end), place: b.place, notes: b.note, color: COLORS[VOICE_TYPES[b.type]], lock: b.lock }));
   });
   var now = Date.now();
   tk.forEach(function (t, i) { tasks.push(normalizeTask({ title: t.title, date: k, created: now + i })); });

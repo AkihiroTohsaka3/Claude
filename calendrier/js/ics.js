@@ -29,6 +29,7 @@ function buildIcs() {
     }
     if (e.place) lines.push("LOCATION:" + icsEscape(e.place));
     if (e.notes) lines.push("DESCRIPTION:" + icsEscape(e.notes));
+    if (e.lock) lines.push("X-LOCKER:TRUE");
     lines.push("END:VEVENT");
   });
   tasks.forEach(function (t) {
@@ -114,7 +115,8 @@ function parseIcs(text) {
       place: r.LOCATION ? r.LOCATION.val : "", notes: r.DESCRIPTION ? r.DESCRIPTION.val : "", color: COLORS[2], rule: rule, until: until,
       every: typeof every === "number" ? every : 1, unit: typeof unit === "string" ? unit : "day", skip: skip,
       reminds: r.alarms.filter(function (m, i, a) { return a.indexOf(m) === i; }).slice(0, 4),
-      tz: validZone((/TZID=([^;:]+)/.exec(r.DTSTART.name) || [])[1])
+      tz: validZone((/TZID=([^;:]+)/.exec(r.DTSTART.name) || [])[1]),
+      lock: !!(r["X-LOCKER"] && /^TRUE$/i.test(r["X-LOCKER"].val.trim()))
     });
     // COUNT=n : la série s'arrête à la n-ième occurrence.
     var countM = r.RRULE && rule ? /COUNT=(\d+)/.exec(r.RRULE.val) : null;

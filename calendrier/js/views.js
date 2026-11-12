@@ -538,7 +538,7 @@ function dayColumn(k) {
       }
       var main = el_("span", "main");
       main.appendChild(el_("b", null, p.ev.title));
-      main.appendChild(el_("small", null, timeLabel(p.ev) + (p.ev.place ? " · " + p.ev.place : "")));
+      main.appendChild(el_("small", null, (p.ev.lock ? "🔒 " : "") + timeLabel(p.ev) + (p.ev.place ? " · " + p.ev.place : "")));
       b.appendChild(main);
       if (p.ev.bAfter) {
         var ba = el_("span", "buf", "Retour " + p.ev.bAfter + " min");
