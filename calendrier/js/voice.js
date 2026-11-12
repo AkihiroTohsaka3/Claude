@@ -367,7 +367,7 @@ function buildPlan(fix) {
   samplePromise.then(function () {
     if (!sampleFn || sampleOff) {
       if (fix) { showStep("preview"); voiceStatus("Les corrections demandent Claude. Modifie plutôt ton texte.", true, vEl.status2); return; }
-      showPlan(localPlan(text, k, extras), "Organisé sur cet appareil" + (window.claude ? " (Claude n'est pas disponible ici)." : ". Ouvre le calendrier depuis Claude pour une organisation plus fine."));
+      showPlan(localPlan(text, k, extras), "Organisé sur cet appareil" + (window.claude ? " (Claude n'est pas disponible ici)." : "."));
       return;
     }
     var ctl = new AbortController();

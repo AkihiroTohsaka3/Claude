@@ -20,14 +20,103 @@ function renderCalVis() {
 el.menuBtn.addEventListener("click", function () { el.menuStatus.textContent = ""; renderCalVis(); renderWorldClock(); openDialog(el.menu); });
 el.menuClose.addEventListener("click", function () { closeDialog(el.menu); });
 el.exportClose.addEventListener("click", function () { closeDialog(el.exportDlg); });
-el.exportBtn.addEventListener("click", function () {
-  el.icsText.value = buildIcs();
+// Fenêtre de texte à copier (export .ics ou sauvegarde complète), avec téléchargement quand il est possible.
+var dlUrl = null;
+function openExport(title, hint, text, filename, type) {
+  byId("exportTitle").textContent = title;
+  byId("export-hint").textContent = hint;
+  el.icsText.value = text;
   el.copyStatus.textContent = "";
+  var dl = byId("dl-btn");
+  if (dlUrl) { URL.revokeObjectURL(dlUrl); dlUrl = null; }
+  // Dans Claude, la page ne peut pas télécharger de fichier : on copie le texte.
+  dl.hidden = !!window.claude;
+  if (!dl.hidden) { dlUrl = URL.createObjectURL(new Blob([text], { type: type })); dl.href = dlUrl; dl.download = filename; }
   closeDialog(el.menu);
   openDialog(el.exportDlg);
   el.icsText.focus();
   el.icsText.select();
+}
+el.exportBtn.addEventListener("click", function () {
+  openExport("Export .ics", "Pour un autre agenda (Google, Samsung…). Copie le texte dans un fichier nommé calendrier.ics, ou télécharge-le, puis ouvre-le avec ton application de calendrier.",
+    buildIcs(), "calendrier.ics", "text/calendar");
 });
+
+// ---------- Sauvegarde complète ----------
+function backupText() {
+  return JSON.stringify({ app: "calendrier-velours", version: 1, date: new Date().toISOString(), events: events, tasks: tasks, settings: settings });
+}
+function restoreBackup(text) {
+  var d = JSON.parse(String(text || "").trim());
+  if (!d || !Array.isArray(d.events) || !Array.isArray(d.tasks)) throw new Error("format");
+  var before = { events: JSON.stringify(events), tasks: JSON.stringify(tasks) };
+  function merge(list, incoming, norm) {
+    var byKey = {};
+    list.forEach(function (x, i) { byKey[x.id] = i; });
+    incoming.forEach(function (x) {
+      if (!x || typeof x !== "object" || !x.date) return;
+      var n = norm(x);
+      if (byKey[n.id] != null) list[byKey[n.id]] = n; else { byKey[n.id] = list.length; list.push(n); }
+    });
+  }
+  merge(events, d.events, normalize);
+  merge(tasks, d.tasks, normalizeTask);
+  if (d.settings && typeof d.settings === "object") {
+    settings = cleanSettings(d.settings);
+    saveSettings();
+    if (settings.theme) applyTheme(settings.theme);
+    applyZoom();
+    renderSettingsBtns();
+  }
+  saveEvents();
+  saveTasks();
+  return { events: d.events.length, tasks: d.tasks.length, before: before };
+}
+byId("backup-btn").addEventListener("click", function () {
+  openExport("Sauvegarde complète", "Copie ce texte (ou télécharge le fichier), puis sur l'autre appareil : Options › Restaurer une sauvegarde, et colle-le.",
+    backupText(), "calendrier-sauvegarde-" + keyOf(new Date()) + ".json", "application/json");
+});
+byId("restore-btn").addEventListener("click", function () {
+  byId("restore-text").value = "";
+  byId("restore-status").textContent = "";
+  closeDialog(el.menu);
+  openDialog(byId("restore"));
+});
+byId("restore-close").addEventListener("click", function () { closeDialog(byId("restore")); });
+function doRestore(text) {
+  var st = byId("restore-status");
+  var r;
+  try { r = restoreBackup(text); } catch (e) { st.className = "status error"; st.textContent = "Ce texte n'est pas une sauvegarde du calendrier. Copie-la en entier, puis recolle-la."; return; }
+  closeDialog(byId("restore"));
+  state.cursor = startOfToday();
+  render(false);
+  showUndo("Sauvegarde restaurée : " + plural(r.events, "événement", "événements") + ", " + plural(r.tasks, "tâche", "tâches"), function () {
+    events = JSON.parse(r.before.events).map(normalize);
+    tasks = JSON.parse(r.before.tasks).map(normalizeTask);
+    saveEvents(); saveTasks(); render(false);
+  });
+}
+byId("restore-go").addEventListener("click", function () { doRestore(byId("restore-text").value); });
+byId("restore-file").addEventListener("change", function () {
+  var f = this.files && this.files[0];
+  if (!f) return;
+  var rd = new FileReader();
+  rd.onload = function () { byId("restore-file").value = ""; doRestore(String(rd.result || "")); };
+  rd.readAsText(f);
+});
+
+// ---------- Application installable (hors de Claude) ----------
+var installEvt = null;
+window.addEventListener("beforeinstallprompt", function (e) { e.preventDefault(); installEvt = e; byId("install-btn").hidden = false; });
+window.addEventListener("appinstalled", function () { installEvt = null; byId("install-btn").hidden = true; });
+byId("install-btn").addEventListener("click", function () {
+  if (!installEvt) return;
+  installEvt.prompt();
+  installEvt.userChoice.then(function () { installEvt = null; byId("install-btn").hidden = true; }, function () {});
+});
+if (!window.claude && "serviceWorker" in navigator && /^https?:$/.test(location.protocol)) {
+  window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () { /* hors ligne indisponible */ }); });
+}
 el.copyBtn.addEventListener("click", function () {
   var text = el.icsText.value;
   var fallback = function () { el.icsText.focus(); el.icsText.select(); el.copyStatus.textContent = "Sélectionné. Appuie longuement pour copier."; };
@@ -106,6 +195,7 @@ bindSwipeClose(el.drawer, function () { closeDialog(el.drawer); });
 bindSwipeClose(el.search, function () { closeDialog(el.search); });
 bindSwipeClose(el.menu, function () { closeDialog(el.menu); });
 bindSwipeClose(el.exportDlg, function () { closeDialog(el.exportDlg); });
+bindSwipeClose(byId("restore"), function () { closeDialog(byId("restore")); });
 
 // Options et sélecteurs : câblage unique
 optGroup(document.getElementById("rule-chips"), [
@@ -281,7 +371,9 @@ refreshDisplays();
 
 // ---------- Synchronisation entre appareils ----------
 var SYNC_TEXT = {
-  local: "Enregistré sur cet appareil uniquement. Ouvre le calendrier depuis Claude, connecté à ton compte, pour le retrouver sur tes autres appareils.",
+  local: window.claude
+    ? "Enregistré sur cet appareil uniquement. Ouvre le calendrier depuis Claude, connecté à ton compte, pour le retrouver sur tes autres appareils."
+    : "Enregistré sur cet appareil. Pense à faire une sauvegarde complète de temps en temps (Options › Données).",
   connecting: "Connexion à ta sauvegarde en ligne…",
   synced: "Synchronisé avec ton compte. Tu retrouves les mêmes données sur ton téléphone et ton ordinateur.",
   saving: "Enregistrement en ligne…",

@@ -7,6 +7,13 @@
 <title>Calendrier Mensuel</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap">
 <link rel="stylesheet" href="css/style.css">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#120b10">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Calendrier">
+<link rel="icon" href="icons/icon-192.png" sizes="192x192">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 </head>
 <body>
 <div class="app" id="app">
@@ -257,6 +264,10 @@
     <datalist id="zones"><option value="Europe/Paris"><option value="Europe/London"><option value="America/New_York"><option value="America/Montreal"><option value="Asia/Tokyo"><option value="Australia/Sydney"><option value="UTC"></datalist>
     <div id="wc-list" class="wc-list"></div>
     <p class="menu-title">Données</p>
+    <button type="button" class="btn" id="install-btn" hidden>Installer l'application sur cet appareil</button>
+    <button type="button" class="btn" id="backup-btn">Sauvegarde complète (pour changer d'appareil)</button>
+    <button type="button" class="btn" id="restore-btn">Restaurer une sauvegarde</button>
+    <p class="hint">La sauvegarde garde tout : événements, tâches, sous-tâches, Locker, réglages. Copie-la ici, puis colle-la dans « Restaurer » sur l'autre appareil.</p>
     <button type="button" class="btn" id="export-btn">Exporter en .ics</button>
     <label class="btn file-btn">Importer un fichier .ics (cours, agenda)
       <input type="file" id="import-file" accept=".ics,text/calendar">
@@ -343,6 +354,26 @@
   </div>
 </dialog>
 
+<!-- Restauration d'une sauvegarde -->
+<dialog id="restore" class="sheet" aria-labelledby="restoreTitle">
+  <div class="sheet-form" style="padding-bottom:0">
+    <div class="grab" aria-hidden="true"></div>
+    <div class="sheet-head">
+      <h2 id="restoreTitle">Restaurer une sauvegarde</h2>
+      <button type="button" class="btn icon" id="restore-close" aria-label="Fermer">&times;</button>
+    </div>
+  </div>
+  <div class="menu-list">
+    <p class="hint">Colle ici la sauvegarde copiée sur l'autre appareil (ou choisis le fichier). Les éléments sont ajoutés à ceux déjà présents ; ceux qui existent déjà sont mis à jour.</p>
+    <textarea id="restore-text" class="ics-area" aria-label="Sauvegarde à restaurer" placeholder="Appuie longuement ici, puis Coller"></textarea>
+    <label class="btn file-btn">Choisir un fichier de sauvegarde
+      <input type="file" id="restore-file" accept=".json,application/json,text/plain">
+    </label>
+    <button type="button" class="btn primary" id="restore-go">Restaurer</button>
+    <p class="status" id="restore-status" role="status"></p>
+  </div>
+</dialog>
+
 <!-- Export .ics -->
 <dialog id="export" class="sheet" aria-labelledby="exportTitle">
   <div class="sheet-form" style="padding-bottom:0">
@@ -353,9 +384,10 @@
     </div>
   </div>
   <div class="menu-list">
-    <p class="hint">Le téléchargement direct n'est pas disponible dans cette fenêtre. Copie le texte, colle-le dans un fichier nommé <b>calendrier.ics</b>, puis ouvre-le avec ton application de calendrier.</p>
-    <textarea id="ics-text" class="ics-area" readonly aria-label="Contenu iCalendar"></textarea>
+    <p class="hint" id="export-hint"></p>
+    <textarea id="ics-text" class="ics-area" readonly aria-label="Contenu à copier"></textarea>
     <button type="button" class="btn primary" id="copy-btn">Copier le texte</button>
+    <a class="btn" id="dl-btn" hidden>Télécharger le fichier</a>
     <p class="status" id="copy-status" role="status"></p>
   </div>
 </dialog>
