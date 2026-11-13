@@ -1,0 +1,56 @@
+#separator:semicolon
+#html:true
+#columns:Recto;Verso;Tags
+#tags column:3
+最;サイ、もっとも<br>le plus, extrême;priorite1
+制;セイ<br>système, règle, contrôle;priorite1
+務;ム、つとめる<br>tâche, fonction, devoir;priorite1
+協;キョウ<br>coopération, co-;priorite1
+取;シュ、とる<br>prendre;priorite1
+加;カ、くわえる、くわわる<br>ajouter, participer;priorite1
+初;ショ、はじめ、はじめて、はつ<br>première fois, début;priorite1
+共;キョウ、とも<br>ensemble, avec;priorite1
+判;ハン、バン<br>jugement, sceau;priorite1
+参;サン、まいる<br>participer, aller/venir (humble);priorite1
+利;リ、きく<br>profit, avantage;priorite1
+信;シン<br>foi, confiance, croire;priorite1
+件;ケン<br>affaire, cas;priorite1
+側;ソク、がわ、そば<br>côté;priorite1
+任;ニン、まかせる<br>responsabilité, confier;priorite1
+勢;セイ、いきおい<br>force, élan;priorite1
+争;ソウ、あらそう<br>dispute, conflit, rivaliser;priorite1
+再;サイ、ふたたび<br>de nouveau, deuxième fois;priorite1
+位;イ、くらい<br>rang, position, environ;priorite1
+与;ヨ、あたえる<br>donner, accorder;priorite1
+供;キョウ、ク、とも、そなえる<br>offrir, accompagner (子供 : enfant);priorite1
+割;カツ、わる、わり、われる<br>diviser, casser, proportion;priorite1
+付;フ、つける、つく<br>attacher, ajouter;priorite1
+優;ユウ、やさしい、すぐれる<br>gentillesse, excellence;priorite1
+収;シュウ、おさめる、おさまる<br>obtenir, récolter, revenu;priorite1
+備;ビ、そなえる<br>préparer, équiper;priorite1
+副;フク<br>vice-, adjoint, secondaire;priorite1
+労;ロウ<br>labeur, peine;priorite1
+例;レイ、たとえる<br>exemple;priorite1
+伝;デン、つたえる、つたわる<br>transmettre;priorite2
+働;ドウ、はたらく<br>travailler;priorite2
+低;テイ、ひくい<br>bas;priorite2
+個;コ<br>individu, compteur d'objets;priorite2
+候;コウ<br>climat, saison, candidat;priorite2
+値;チ、ね、あたい<br>prix, valeur;priorite2
+効;コウ、きく<br>efficacité, effet;priorite2
+処;ショ<br>traiter, gérer;priorite2
+単;タン<br>simple, unique;priorite2
+危;キ、あぶない、あやうい<br>danger;priorite2
+亡;ボウ、なくなる<br>mourir, défunt;priorite2
+冷;レイ、つめたい、ひえる、ひやす<br>froid, refroidir;priorite2
+児;ジ、ニ<br>enfant;priorite2
+余;ヨ、あまる、あまり<br>surplus, reste;priorite2
+印;イン、しるし<br>sceau, marque;priorite2
+久;キュウ、ク、ひさしい<br>longtemps;priorite2
+便;ベン、ビン、たより<br>commodité, vol, courrier;priorite2
+停;テイ<br>arrêt;priorite2
+努;ド、つとめる<br>effort;priorite2
+則;ソク<br>règle, loi;priorite2
+厚;コウ、あつい<br>épais, chaleureux;priorite2
+卒;ソツ<br>diplôme, finir ses études;priorite2
+倒;トウ、たおれる、たおす<br>tomber, renverser;priorite2
