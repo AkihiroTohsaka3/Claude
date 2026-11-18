@@ -144,7 +144,7 @@ function weekLabels() { var out = []; for (var i = 0; i < 7; i++) out.push(DAYS_
 // Écrits dans le code : présents pour tous ceux qui ouvrent le calendrier, et impossibles à modifier,
 // déplacer ou supprimer dans l'application. Ils sont dans `events` comme les autres (AnkiLock les lit).
 var FIXED_EVENTS = [
-  { id: "fixe-dormir", title: "Dormir", date: "2020-01-01", start: "01:00", end: "04:00", rule: "daily", lock: true, color: COLORS[4] },
+  { id: "fixe-dormir", title: "Dormir", date: "2020-01-01", start: "00:00", end: "04:00", rule: "weekdays", lock: true, color: COLORS[4] },
   { id: "fixe-revision", title: "Révision", date: "2020-01-01", start: "18:30", end: "19:30", rule: "weekdays", lock: true, color: COLORS[1] }
 ];
 var FIXED_IDS = {};
