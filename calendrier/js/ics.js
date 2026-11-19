@@ -7,7 +7,7 @@ function icsKey(k) { return k.replace(/-/g, ""); }
 function icsDateTime(k, hhmm) { return icsKey(k) + "T" + hhmm.replace(":", "") + "00"; }
 function nextKey(k) { return keyOf(addDays(parseKey(k), 1)); }
 function stamp() { return new Date().toISOString().replace(/[-:]/g, "").slice(0, 15) + "Z"; }
-var RRULES = { daily: "FREQ=DAILY", weekdays: "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR", weekly: "FREQ=WEEKLY", monthly: "FREQ=MONTHLY", yearly: "FREQ=YEARLY" };
+var RRULES = { daily: "FREQ=DAILY", weekdays: "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR", sunthu: "FREQ=WEEKLY;BYDAY=SU,MO,TU,WE,TH", weekly: "FREQ=WEEKLY", monthly: "FREQ=MONTHLY", yearly: "FREQ=YEARLY" };
 function buildIcs() {
   var lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Calendrier Velours//FR", "CALSCALE:GREGORIAN"];
   events.forEach(function (e) {

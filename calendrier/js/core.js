@@ -6,7 +6,7 @@ var MONTHS_SHORT = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "
 var DAYS = ["dimanche", "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi"];
 var DAYS_SHORT = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
 var COLORS = ["#f4b4c4", "#e9cf8e", "#c9d3e6", "#b89cc0", "#a8d5c2"];
-var RULE_LABELS = { daily: "Chaque jour", weekdays: "Jours ouvrés", weekly: "Chaque semaine", monthly: "Chaque mois", yearly: "Chaque année", every: "Personnalisée" };
+var RULE_LABELS = { daily: "Chaque jour", weekdays: "Jours ouvrés", weekly: "Chaque semaine", monthly: "Chaque mois", yearly: "Chaque année", every: "Personnalisée", sunthu: "Du dimanche au jeudi" };
 var TASK_RULES = [{ value: "", label: "Une fois" }, { value: "daily", label: "Chaque jour" }, { value: "weekdays", label: "Jours ouvrés" }, { value: "weekly", label: "Chaque semaine" }, { value: "monthly", label: "Chaque mois" }];
 var THEMES = ["rose", "oled", "mocha", "neon"];
 var SNAP = 15;
@@ -144,7 +144,9 @@ function weekLabels() { var out = []; for (var i = 0; i < 7; i++) out.push(DAYS_
 // Écrits dans le code : présents pour tous ceux qui ouvrent le calendrier, et impossibles à modifier,
 // déplacer ou supprimer dans l'application. Ils sont dans `events` comme les autres (AnkiLock les lit).
 var FIXED_EVENTS = [
-  { id: "fixe-dormir", title: "Dormir", date: "2020-01-01", start: "00:00", end: "04:00", rule: "weekdays", lock: true, color: COLORS[4] },
+  // Commence la veille au soir et finit le lendemain à 4 h (une fin avant le début = le lendemain).
+  // Soirs du dimanche au jeudi : pas les nuits du vendredi au samedi ni du samedi au dimanche.
+  { id: "fixe-dormir", title: "Dormir", date: "2020-01-01", start: "23:30", end: "04:00", rule: "sunthu", lock: true, color: COLORS[4] },
   { id: "fixe-revision", title: "Révision", date: "2020-01-01", start: "18:30", end: "19:30", rule: "weekdays", lock: true, color: COLORS[1] }
 ];
 var FIXED_IDS = {};
@@ -175,6 +177,7 @@ function occursOn(ev, k) {
   switch (ev.rule) {
     case "daily": return true;
     case "weekdays": return d.getDay() > 0 && d.getDay() < 6;
+    case "sunthu": return d.getDay() < 5;
     case "weekly": return d.getDay() === s.getDay();
     case "monthly": return d.getDate() === s.getDate();
     case "yearly": return d.getDate() === s.getDate() && d.getMonth() === s.getMonth();
