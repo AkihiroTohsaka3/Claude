@@ -441,7 +441,8 @@ function renderDay() {
   var top = el_("div", "day-top");
   if (isToday) {
     var now0 = new Date(), nowMin0 = now0.getHours() * 60 + now0.getMinutes();
-    var current = timed.filter(function (e) { return toMin(e.start) <= nowMin0 && endMin(e) > nowMin0; })[0];
+    var carried = carryOver(k).filter(function (e) { return nowMin0 < toMin(e.end); })[0];
+    var current = carried || timed.filter(function (e) { return toMin(e.start) <= nowMin0 && endMin(e) > nowMin0; })[0];
     var next = timed.filter(function (e) { return toMin(e.start) > nowMin0; })[0];
     var txt = current ? "En cours : " + current.title + " jusqu'à " + current.end
       : next ? "Prochain : " + next.title + " dans " + fmtDur(toMin(next.start) - nowMin0)
@@ -486,6 +487,11 @@ function appendTimeline(keys) {
   wrap.scrollTop = target;
 }
 
+// Événements de la veille qui finissent après minuit : leur suite (de 00:00 à la fin) s'affiche aussi ce jour-là.
+function carryOver(k) {
+  var prev = keyOf(addDays(parseKey(k), -1));
+  return eventsOn(prev).filter(function (ev) { return !ev.allDay && toMin(ev.end) < toMin(ev.start) && toMin(ev.end) > 0; });
+}
 function dayColumn(k) {
   var P = ppm(), isToday = k === keyOf(new Date());
   var slots = el_("div", "slots" + (isToday ? " today" : ""));
@@ -508,17 +514,19 @@ function dayColumn(k) {
 
   // Les événements qui se chevauchent se partagent la largeur ; les autres la prennent en entier.
   var groups = [], cur = null;
-  eventsOn(k).forEach(function (ev) {
-    if (ev.allDay) return;
-    var st = toMin(ev.start), en = Math.max(endMin(ev), Math.min(1440, st + 30));
-    var from = Math.max(0, st - ev.bBefore), to = Math.min(1440, en + ev.bAfter);
+  var items = carryOver(k).map(function (ev) { return { ev: ev, carry: true }; })
+    .concat(eventsOn(k).filter(function (ev) { return !ev.allDay; }).map(function (ev) { return { ev: ev, carry: false }; }));
+  items.forEach(function (it) {
+    var ev = it.ev, st, en, from, to;
+    if (it.carry) { st = 0; en = Math.max(toMin(ev.end), 30); from = 0; to = Math.min(1440, en + ev.bAfter); }
+    else { st = toMin(ev.start); en = Math.max(endMin(ev), Math.min(1440, st + 30)); from = Math.max(0, st - ev.bBefore); to = Math.min(1440, en + ev.bAfter); }
     if (!cur || from >= cur.end) { cur = { items: [], laneEnds: [], end: 0 }; groups.push(cur); }
     var lane = -1;
     for (var i = 0; i < cur.laneEnds.length; i++) { if (cur.laneEnds[i] <= from) { lane = i; break; } }
     if (lane < 0) lane = cur.laneEnds.length;
     cur.laneEnds[lane] = to;
     cur.end = Math.max(cur.end, to);
-    cur.items.push({ ev: ev, st: st, en: en, from: from, to: to, lane: lane });
+    cur.items.push({ ev: ev, st: st, en: en, from: from, to: to, lane: lane, carry: it.carry });
   });
   groups.forEach(function (g) {
     var total = g.laneEnds.length;
@@ -538,7 +546,9 @@ function dayColumn(k) {
       }
       var main = el_("span", "main");
       main.appendChild(el_("b", null, p.ev.title));
-      main.appendChild(el_("small", null, (p.ev.lock ? "🔒 " : "") + timeLabel(p.ev) + (p.ev.place ? " · " + p.ev.place : "")));
+      var when = p.carry ? "Suite de la veille · jusqu'à " + p.ev.end : timeLabel(p.ev);
+      main.appendChild(el_("small", null, (p.ev.lock ? "🔒 " : "") + when + (p.ev.place ? " · " + p.ev.place : "")));
+      if (p.carry) b.setAttribute("aria-label", p.ev.title + ", suite de la veille jusqu'à " + p.ev.end);
       b.appendChild(main);
       if (p.ev.bAfter) {
         var ba = el_("span", "buf", "Retour " + p.ev.bAfter + " min");
@@ -548,7 +558,8 @@ function dayColumn(k) {
       var grip = el_("span", "grip");
       grip.setAttribute("aria-hidden", "true");
       b.appendChild(grip);
-      if (isFixed(p.ev)) grip.hidden = true; else bindEventDrag(b, p, k);
+      // La suite d'un événement de la veille ne se déplace pas : on le modifie depuis son jour de début.
+      if (isFixed(p.ev) || p.carry) grip.hidden = true; else bindEventDrag(b, p, k);
       b.addEventListener("click", function (e) {
         e.stopPropagation();
         if (suppressClick) return;
